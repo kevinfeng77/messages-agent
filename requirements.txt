@@ -1,0 +1,10 @@
+# Core dependencies for Messages Agent
+# Note: This project only requires Python standard library
+# All dependencies below are for future AI integration
+
+# Future AI integration (optional)
+# openai>=1.0.0         # OpenAI API
+# anthropic             # Anthropic API
+
+# Optional enhancements
+# rich                  # Better console output
