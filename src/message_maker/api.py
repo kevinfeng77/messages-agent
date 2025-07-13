@@ -28,11 +28,12 @@ class MessageMakerService:
         self.llm_client = LLMClient()
         self.logger = get_logger(__name__)
 
-    def generate_message_responses(self, request: MessageRequest) -> MessageResponse:
+    def generate_message_responses(self, request: MessageRequest, max_context_messages: int = 2000) -> MessageResponse:
         """Generate three response variations for a new message.
         
         Args:
             request: MessageRequest with chat_id, user_id, contents
+            max_context_messages: Maximum number of recent messages to use for context (default: 2000)
             
         Returns:
             MessageResponse with response_1, response_2, response_3
@@ -57,12 +58,11 @@ class MessageMakerService:
                 user_id=request.user_id
             )
             
-            # Limit to most recent messages to avoid token limits (40k tokens/min = ~5000 messages)
+            # Limit to most recent messages to avoid token limits
             original_count = len(chat_history)
-            max_messages = 2000  # Testing with 2000 messages as requested
-            if original_count > max_messages:
-                chat_history = chat_history[-max_messages:]
-                self.logger.info(f"Limited chat history to most recent {max_messages} messages (from {original_count} total)")
+            if original_count > max_context_messages:
+                chat_history = chat_history[-max_context_messages:]
+                self.logger.info(f"Limited chat history to most recent {max_context_messages} messages (from {original_count} total)")
             
             self.logger.info(f"Using {len(chat_history)} messages from chat history")
         except Exception as e:
@@ -93,7 +93,7 @@ class MessageMakerService:
             raise Exception(f"LLM API error: {e}")
 
 
-def generate_message_responses(request: MessageRequest) -> MessageResponse:
+def generate_message_responses(request: MessageRequest, max_context_messages: int = 2000) -> MessageResponse:
     """Generate three response variations for a new message.
     
     This is the main API function that orchestrates the entire message response
@@ -101,6 +101,7 @@ def generate_message_responses(request: MessageRequest) -> MessageResponse:
     
     Args:
         request: MessageRequest with chat_id, user_id, contents
+        max_context_messages: Maximum number of recent messages to use for context (default: 2000)
         
     Returns:
         MessageResponse with response_1, response_2, response_3
@@ -110,4 +111,4 @@ def generate_message_responses(request: MessageRequest) -> MessageResponse:
         Exception: If database connection or LLM API errors occur
     """
     service = MessageMakerService()
-    return service.generate_message_responses(request)
+    return service.generate_message_responses(request, max_context_messages)
