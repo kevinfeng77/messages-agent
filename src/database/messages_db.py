@@ -28,14 +28,15 @@ class MessagesDatabase:
             with sqlite3.connect(str(self.db_path)) as conn:
                 cursor = conn.cursor()
                 
-                # Create users table with exact schema from ticket
+                # Create users table with handle_id column
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS users (
                         user_id TEXT NOT NULL,
                         first_name TEXT NOT NULL,
                         last_name TEXT NOT NULL,
                         phone_number TEXT NOT NULL,
-                        email TEXT NOT NULL
+                        email TEXT NOT NULL,
+                        handle_id INTEGER
                     )
                 """)
                 
@@ -44,6 +45,7 @@ class MessagesDatabase:
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone_number)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_name ON users(first_name, last_name)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_handle_id ON users(handle_id)")
                 
                 conn.commit()
                 logger.info(f"Created messages database at {self.db_path}")
@@ -68,14 +70,15 @@ class MessagesDatabase:
                 cursor = conn.cursor()
                 
                 cursor.execute("""
-                    INSERT INTO users (user_id, first_name, last_name, phone_number, email)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO users (user_id, first_name, last_name, phone_number, email, handle_id)
+                    VALUES (?, ?, ?, ?, ?, ?)
                 """, (
                     user.user_id,
                     user.first_name,
                     user.last_name,
                     user.phone_number,
-                    user.email
+                    user.email,
+                    user.handle_id
                 ))
                 
                 conn.commit()
@@ -104,13 +107,13 @@ class MessagesDatabase:
                 
                 # Prepare data for batch insert
                 user_data = [
-                    (user.user_id, user.first_name, user.last_name, user.phone_number, user.email)
+                    (user.user_id, user.first_name, user.last_name, user.phone_number, user.email, user.handle_id)
                     for user in users
                 ]
                 
                 cursor.executemany("""
-                    INSERT INTO users (user_id, first_name, last_name, phone_number, email)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO users (user_id, first_name, last_name, phone_number, email, handle_id)
+                    VALUES (?, ?, ?, ?, ?, ?)
                 """, user_data)
                 
                 inserted_count = cursor.rowcount
@@ -138,7 +141,7 @@ class MessagesDatabase:
                 cursor = conn.cursor()
                 
                 cursor.execute("""
-                    SELECT user_id, first_name, last_name, phone_number, email
+                    SELECT user_id, first_name, last_name, phone_number, email, handle_id
                     FROM users WHERE user_id = ?
                 """, (user_id,))
                 
@@ -167,7 +170,7 @@ class MessagesDatabase:
                 cursor = conn.cursor()
                 
                 cursor.execute("""
-                    SELECT user_id, first_name, last_name, phone_number, email
+                    SELECT user_id, first_name, last_name, phone_number, email, handle_id
                     FROM users WHERE phone_number = ?
                 """, (phone_number,))
                 
@@ -192,7 +195,7 @@ class MessagesDatabase:
                 cursor = conn.cursor()
                 
                 cursor.execute("""
-                    SELECT user_id, first_name, last_name, phone_number, email
+                    SELECT user_id, first_name, last_name, phone_number, email, handle_id
                     FROM users WHERE email = ?
                 """, (email.lower(),))
                 
@@ -201,6 +204,67 @@ class MessagesDatabase:
         except sqlite3.Error as e:
             logger.error(f"Error getting users by email {email}: {e}")
             return []
+
+    def get_user_by_handle_id(self, handle_id: int) -> Optional[User]:
+        """
+        Get a user by their handle ID
+        
+        Args:
+            handle_id: Handle ID to search for
+            
+        Returns:
+            User object if found, None otherwise
+        """
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute("""
+                    SELECT user_id, first_name, last_name, phone_number, email, handle_id
+                    FROM users WHERE handle_id = ?
+                """, (handle_id,))
+                
+                row = cursor.fetchone()
+                if row:
+                    return User(*row)
+                
+                return None
+                
+        except sqlite3.Error as e:
+            logger.error(f"Error getting user by handle_id {handle_id}: {e}")
+            return None
+
+    def update_user_handle_id(self, user_id: str, handle_id: int) -> bool:
+        """
+        Update a user's handle_id
+        
+        Args:
+            user_id: User ID to update
+            handle_id: New handle ID value
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute("""
+                    UPDATE users SET handle_id = ? WHERE user_id = ?
+                """, (handle_id, user_id))
+                
+                conn.commit()
+                
+                if cursor.rowcount > 0:
+                    logger.info(f"Updated handle_id for user {user_id} to {handle_id}")
+                    return True
+                else:
+                    logger.warning(f"No user found with user_id {user_id}")
+                    return False
+                
+        except sqlite3.Error as e:
+            logger.error(f"Error updating handle_id for user {user_id}: {e}")
+            return False
 
     def get_all_users(self, limit: Optional[int] = None) -> List[User]:
         """
@@ -216,7 +280,7 @@ class MessagesDatabase:
             with sqlite3.connect(str(self.db_path)) as conn:
                 cursor = conn.cursor()
                 
-                query = "SELECT user_id, first_name, last_name, phone_number, email FROM users"
+                query = "SELECT user_id, first_name, last_name, phone_number, email, handle_id FROM users"
                 if limit:
                     query += f" LIMIT {limit}"
                 
