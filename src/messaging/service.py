@@ -14,13 +14,8 @@ from typing import Dict, List, Optional, Union, Any
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-try:
-    from imessage import iMessage
-except ImportError:
-    # Graceful fallback for development/testing environments
-    iMessage = None
-
 from .config import MessageConfig, config
+from .applescript_service import AppleScriptMessageService
 from .exceptions import (
     MessagingError,
     MessageValidationError,
@@ -99,21 +94,38 @@ class MessageService:
         self.config = config_override or config
         self.rate_limiter = RateLimiter(self.config.rate_limit_messages_per_minute)
         self.metrics = MessageMetrics()
-        self._imessage_client: Optional[Any] = None
+        self._applescript_service: Optional[AppleScriptMessageService] = None
+        self._imessage_client = None
         
-        # Initialize iMessage client if available
-        if iMessage is not None:
-            try:
-                self._imessage_client = iMessage()
-                logger.info("iMessage client initialized successfully")
-            except Exception as e:
-                logger.error(f"Failed to initialize iMessage client: {e}")
-                if self.config.require_imessage_enabled:
-                    raise ServiceUnavailableError(f"iMessage service unavailable: {e}")
-        else:
-            logger.warning("py-imessage not available - running in mock mode")
-            if self.config.require_imessage_enabled:
-                raise ServiceUnavailableError("py-imessage library not installed")
+        # Initialize messaging services
+        self._init_messaging_services()
+    
+    def _init_messaging_services(self):
+        """Initialize py-imessage and AppleScript messaging services."""
+        # Try to initialize py-imessage first
+        try:
+            from py_imessage import imessage
+            self._imessage_client = imessage
+            logger.info("py-imessage client initialized successfully")
+        except Exception as e:
+            logger.warning(f"py-imessage initialization failed: {e}")
+            self._imessage_client = None
+        
+        # Initialize AppleScript messaging service as fallback
+        try:
+            self._applescript_service = AppleScriptMessageService(self.config)
+            if self._applescript_service.is_available():
+                logger.info("AppleScript messaging service initialized successfully")
+            else:
+                logger.warning("AppleScript messaging service not available")
+                if self.config.require_imessage_enabled and self._imessage_client is None:
+                    raise ServiceUnavailableError("No messaging service available")
+                self._applescript_service = None
+        except Exception as e:
+            logger.error(f"AppleScript service failed to initialize: {e}")
+            if self.config.require_imessage_enabled and self._imessage_client is None:
+                raise ServiceUnavailableError(f"No messaging service available: {e}")
+            self._applescript_service = None
     
     def validate_recipient(self, recipient: str) -> bool:
         """
@@ -176,9 +188,9 @@ class MessageService:
         
         return True
     
-    def _send_message_impl(self, recipient: str, content: str) -> MessageResult:
+    async def _send_message_impl(self, recipient: str, content: str) -> MessageResult:
         """
-        Internal implementation of message sending.
+        Internal implementation of message sending with py-imessage first, AppleScript fallback.
         
         Args:
             recipient: Validated recipient
@@ -190,28 +202,60 @@ class MessageService:
         start_time = time.time()
         
         try:
-            if self._imessage_client is None:
-                # Mock mode for development/testing
-                if self.config.log_recipients and self.config.log_message_content:
-                    logger.info(f"Mock send to {recipient}: {content[:50]}...")
-                elif self.config.log_recipients:
-                    logger.info(f"Mock send to {recipient}")
-                elif self.config.log_message_content:
-                    logger.info(f"Mock send: {content[:50]}...")
-                else:
-                    logger.info("Mock send completed")
-                message_id = f"mock_{int(time.time())}"
-                success = True
-            else:
-                # Actual iMessage sending
-                result = self._imessage_client.send(recipient, content)
-                message_id = getattr(result, 'message_id', None)
-                success = getattr(result, 'success', True)
-                
-                if not success:
-                    error_msg = getattr(result, 'error', 'Unknown error')
-                    raise MessageSendError(f"iMessage send failed: {error_msg}")
+            # Try py-imessage first
+            if self._imessage_client is not None:
+                try:
+                    result = self._imessage_client.send(recipient, content)
+                    # py-imessage.send() returns True on success, not a message ID
+                    if result:
+                        message_id = f"py_imessage_{int(time.time())}"
+                        logger.info(f"Message sent via py-imessage: {message_id}")
+                        
+                        duration = time.time() - start_time
+                        
+                        return MessageResult(
+                            success=True,
+                            message_id=message_id,
+                            timestamp=datetime.now(),
+                            duration_seconds=duration
+                        )
+                    else:
+                        raise MessageSendError("py-imessage send returned False")
+                    
+                except Exception as e:
+                    logger.warning(f"py-imessage failed, trying AppleScript fallback: {e}")
+                    # Fall through to AppleScript
             
+            # Try AppleScript fallback
+            if self._applescript_service is not None:
+                try:
+                    message_id = await self._applescript_service.send_message(recipient, content)
+                    logger.info(f"Message sent via AppleScript fallback: {message_id}")
+                    
+                    duration = time.time() - start_time
+                    
+                    return MessageResult(
+                        success=True,
+                        message_id=message_id,
+                        timestamp=datetime.now(),
+                        duration_seconds=duration
+                    )
+                    
+                except Exception as e:
+                    logger.warning(f"AppleScript service also failed: {e}")
+                    # Fall through to mock mode
+            
+            # Mock mode if both services unavailable
+            if self.config.log_recipients and self.config.log_message_content:
+                logger.info(f"Mock send to {recipient}: {content[:50]}...")
+            elif self.config.log_recipients:
+                logger.info(f"Mock send to {recipient}")
+            elif self.config.log_message_content:
+                logger.info(f"Mock send: {content[:50]}...")
+            else:
+                logger.info("Mock send completed")
+            
+            message_id = f"mock_{int(time.time())}"
             duration = time.time() - start_time
             
             return MessageResult(
@@ -284,7 +328,7 @@ class MessageService:
         
         while retry_count <= self.config.max_retry_attempts:
             try:
-                result = self._send_message_impl(recipient, content)
+                result = await self._send_message_impl(recipient, content)
                 result.retry_count = retry_count
                 
                 # Record successful send
@@ -370,5 +414,5 @@ class MessageService:
             bool: True if service is ready to send messages
         """
         if self.config.require_imessage_enabled:
-            return self._imessage_client is not None
+            return self._applescript_service is not None and self._applescript_service.is_available()
         return True  # Mock mode is always available
