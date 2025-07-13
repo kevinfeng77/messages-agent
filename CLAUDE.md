@@ -331,6 +331,85 @@ git pull origin main
 git branch -d kevin/{description}
 ```
 
+### Git Worktrees for Parallel Development
+
+**Git worktrees enable working on multiple branches simultaneously without stashing or switching contexts.**
+
+#### When to Use Git Worktrees
+- **Hotfix Development**: Work on urgent fixes while maintaining progress on feature branches
+- **Code Reviews**: Check out PR branches in separate directories for IDE-based review
+- **Experimentation**: Test new approaches without disrupting main development workflow
+- **Parallel Features**: Develop multiple features concurrently without context switching
+
+#### Worktree Management Commands
+```bash
+# List all worktrees
+git worktree list
+
+# Add worktree for existing branch
+git worktree add ../message-agent-feature feature-branch-name
+
+# Add worktree and create new branch
+git worktree add -b kevin/new-feature ../message-agent-new-feature
+
+# Add worktree for hotfix from main
+git worktree add -b kevin/hotfix-urgent ../message-agent-hotfix main
+
+# Remove completed worktree
+git worktree remove ../message-agent-feature
+
+# Clean up stale worktree metadata
+git worktree prune
+```
+
+#### Recommended Directory Structure
+```
+parent-directory/
+├── message-agent/              # Main development directory
+├── message-agent-hotfix/       # Hotfix worktree
+├── message-agent-review/       # PR review worktree
+└── message-agent-experimental/ # Experimental feature worktree
+```
+
+#### Worktree Workflow Best Practices
+1. **Consistent Naming**: Use `{repo-name}-{purpose}` pattern for worktree directories
+2. **Regular Updates**: Keep worktrees synchronized with remote changes:
+   ```bash
+   # In each worktree directory
+   git fetch origin
+   git pull origin main  # or relevant base branch
+   ```
+3. **Clean Commits**: Always commit or stash changes before switching between worktrees
+4. **Strategic Cleanup**: Remove worktrees promptly after branch merging to avoid clutter
+5. **Branch Tracking**: Ensure each worktree branch tracks appropriate remote branch:
+   ```bash
+   git branch --set-upstream-to=origin/feature-branch
+   ```
+
+#### Advanced Worktree Workflows
+```bash
+# Create worktree for PR review
+git fetch origin pull/123/head:pr-123
+git worktree add ../message-agent-pr123 pr-123
+
+# Cherry-pick commits between worktrees
+cd ../message-agent-feature
+git cherry-pick <commit-hash-from-other-worktree>
+
+# Create experimental worktree from current branch
+git worktree add -b kevin/experiment ../message-agent-experiment
+
+# Worktree for database migration testing
+git worktree add -b kevin/migration-test ../message-agent-migration
+```
+
+#### Integration with Message Agent Development
+- **Phase Development**: Use separate worktrees for each development phase
+- **Database Testing**: Isolate database migration testing in dedicated worktrees  
+- **Graphiti Experiments**: Test knowledge graph changes without affecting main development
+- **API Development**: Parallel development of different API endpoints
+- **Performance Testing**: Dedicated worktree for performance optimization work
+
 ### GitHub MCP Workflow (PREFERRED METHOD)
 **ALWAYS use GitHub MCP tools instead of external CLI tools:**
 
@@ -357,6 +436,45 @@ mcp__github__create_pull_request(
 - Integrated authentication and error handling
 - Consistent API interface across all operations
 - Better error messages and debugging capabilities
+
+### GitHub Actions & Branch Protection
+
+**All PRs must pass automated tests before merging via GitHub Actions workflow.**
+
+#### Required Status Checks
+The repository uses a GitHub Actions workflow (`.github/workflows/test.yml`) that runs:
+
+1. **Test Suite**: `just test` - Runs all unit and integration tests
+2. **Dependencies**: Automatic installation of testing dependencies
+
+**Note**: Code formatting, linting, and validation scripts are currently disabled pending setup fixes.
+
+#### Workflow Triggers
+- **Pull Requests**: All PRs to `main` or `master` branches
+- **Direct Pushes**: Commits pushed directly to `main` or `master`
+
+#### Branch Protection Rules
+Configure the following branch protection rules in GitHub repository settings:
+- **Require status checks to pass**: Enable for the "Tests" workflow
+- **Require branches to be up to date**: Ensure PRs include latest main changes
+- **Include administrators**: Apply rules to repository administrators
+- **Restrict pushes**: Only allow merges through pull requests
+
+#### Workflow Configuration
+```yaml
+# .github/workflows/test.yml
+name: Tests
+on:
+  pull_request:
+    branches: [ main, master ]
+  push:
+    branches: [ main, master ]
+```
+
+**This ensures no code reaches main without:**
+- ✅ All tests passing (`just test`)
+
+**Note**: Code formatting, linting, and validation checks will be added to CI once properly configured.
 
 ### Linting & Quality (MANDATORY BEFORE PR)
 ```bash
