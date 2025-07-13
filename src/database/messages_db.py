@@ -46,7 +46,7 @@ class MessagesDatabase:
                 cursor.execute(
                     """
                     CREATE TABLE IF NOT EXISTS chats (
-                        chat_id TEXT NOT NULL PRIMARY KEY,
+                        chat_id INTEGER NOT NULL PRIMARY KEY,
                         display_name TEXT NOT NULL
                     )
                 """
@@ -56,11 +56,38 @@ class MessagesDatabase:
                 cursor.execute(
                     """
                     CREATE TABLE IF NOT EXISTS chat_users (
-                        chat_id TEXT NOT NULL,
+                        chat_id INTEGER NOT NULL,
                         user_id TEXT NOT NULL,
                         FOREIGN KEY (chat_id) REFERENCES chats (chat_id) ON DELETE CASCADE,
                         FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE,
                         PRIMARY KEY (chat_id, user_id)
+                    )
+                """
+                )
+
+                # Create messages table with simplified schema
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS messages (
+                        message_id INTEGER NOT NULL PRIMARY KEY,
+                        user_id TEXT NOT NULL,
+                        contents TEXT NOT NULL,
+                        is_from_me BOOLEAN,
+                        created_at TIMESTAMP NOT NULL
+                    )
+                """
+                )
+
+                # Create chat_messages junction table (from chat_message_join)
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS chat_messages (
+                        chat_id INTEGER NOT NULL,
+                        message_id INTEGER NOT NULL,
+                        message_date TIMESTAMP NOT NULL,
+                        FOREIGN KEY (chat_id) REFERENCES chats (chat_id) ON DELETE CASCADE,
+                        FOREIGN KEY (message_id) REFERENCES messages (message_id) ON DELETE CASCADE,
+                        PRIMARY KEY (chat_id, message_id)
                     )
                 """
                 )
@@ -90,10 +117,31 @@ class MessagesDatabase:
                 cursor.execute(
                     "CREATE INDEX IF NOT EXISTS idx_chat_users_user_id ON chat_users(user_id)"
                 )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_messages_message_id ON messages(message_id)"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_messages_user_id ON messages(user_id)"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at)"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_messages_is_from_me ON messages(is_from_me)"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_chat_messages_chat_id ON chat_messages(chat_id)"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_chat_messages_message_id ON chat_messages(message_id)"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_chat_messages_message_date ON chat_messages(message_date)"
+                )
 
                 conn.commit()
                 logger.info(
-                    f"Created messages database with users and chats tables at {self.db_path}"
+                    f"Created messages database with users, chats, messages, and chat_messages tables at {self.db_path}"
                 )
                 return True
 
@@ -482,13 +530,13 @@ class MessagesDatabase:
             return None
 
     def insert_chat(
-        self, chat_id: str, display_name: str, user_ids: List[str] = None
+        self, chat_id: int, display_name: str, user_ids: List[str] = None
     ) -> bool:
         """
         Insert a chat into the chats table and optionally add users
 
         Args:
-            chat_id: Unique identifier for the chat
+            chat_id: Unique integer identifier for the chat
             display_name: Display name of the chat
             user_ids: Optional list of user IDs to add to the chat
 
@@ -531,7 +579,7 @@ class MessagesDatabase:
         Insert multiple chats in a batch operation
 
         Args:
-            chats: List of chat dictionaries with keys: chat_id, display_name, user_ids
+            chats: List of chat dictionaries with keys: chat_id (int), display_name, user_ids
 
         Returns:
             Number of chats successfully inserted
@@ -584,12 +632,12 @@ class MessagesDatabase:
             logger.error(f"Error inserting chats batch: {e}")
             return 0
 
-    def get_chat_by_id(self, chat_id: str) -> Optional[Dict[str, Any]]:
+    def get_chat_by_id(self, chat_id: int) -> Optional[Dict[str, Any]]:
         """
         Get a chat by its ID with associated users
 
         Args:
-            chat_id: Chat ID to search for
+            chat_id: Integer chat ID to search for
 
         Returns:
             Chat dictionary with user_ids list if found, None otherwise
@@ -765,12 +813,12 @@ class MessagesDatabase:
             logger.error(f"Error clearing chats tables: {e}")
             return False
 
-    def add_user_to_chat(self, chat_id: str, user_id: str) -> bool:
+    def add_user_to_chat(self, chat_id: int, user_id: str) -> bool:
         """
         Add a user to an existing chat
 
         Args:
-            chat_id: Chat ID to add user to
+            chat_id: Integer chat ID to add user to
             user_id: User ID to add
 
         Returns:
@@ -795,12 +843,12 @@ class MessagesDatabase:
             logger.error(f"Error adding user {user_id} to chat {chat_id}: {e}")
             return False
 
-    def remove_user_from_chat(self, chat_id: str, user_id: str) -> bool:
+    def remove_user_from_chat(self, chat_id: int, user_id: str) -> bool:
         """
         Remove a user from a chat
 
         Args:
-            chat_id: Chat ID to remove user from
+            chat_id: Integer chat ID to remove user from
             user_id: User ID to remove
 
         Returns:
@@ -878,12 +926,12 @@ class MessagesDatabase:
             logger.error(f"Error getting chats for user {user_id}: {e}")
             return []
 
-    def get_chat_users_with_details(self, chat_id: str) -> List[Dict[str, Any]]:
+    def get_chat_users_with_details(self, chat_id: int) -> List[Dict[str, Any]]:
         """
         Get full user details for all users in a chat
 
         Args:
-            chat_id: Chat ID to get users for
+            chat_id: Integer chat ID to get users for
 
         Returns:
             List of user detail dictionaries
@@ -922,3 +970,435 @@ class MessagesDatabase:
         except sqlite3.Error as e:
             logger.error(f"Error getting user details for chat {chat_id}: {e}")
             return []
+
+    def insert_message(
+        self,
+        message_id: int,
+        user_id: str,
+        contents: str,
+        is_from_me: bool,
+        created_at: str,
+    ) -> bool:
+        """
+        Insert a single message into the messages table
+
+        Args:
+            message_id: Unique numeric identifier for the message
+            user_id: ID of the user who sent/received the message
+            contents: Text content of the message
+            is_from_me: Whether the message was sent by the user
+            created_at: Timestamp when the message was created (ISO format)
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+
+                cursor.execute(
+                    """
+                    INSERT INTO messages (message_id, user_id, contents, is_from_me, created_at)
+                    VALUES (?, ?, ?, ?, ?)
+                """,
+                    (message_id, user_id, contents, is_from_me, created_at),
+                )
+
+                conn.commit()
+                return True
+
+        except sqlite3.Error as e:
+            logger.error(f"Error inserting message {message_id}: {e}")
+            return False
+
+    def insert_messages_batch(self, messages: List[Dict[str, Any]]) -> int:
+        """
+        Insert multiple messages in a batch operation
+
+        Args:
+            messages: List of message dictionaries with keys:
+                     message_id (int), user_id, contents, is_from_me, created_at
+
+        Returns:
+            Number of messages successfully inserted
+        """
+        if not messages:
+            return 0
+
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+
+                # Prepare data for batch insert
+                message_data = [
+                    (
+                        msg["message_id"],
+                        msg["user_id"],
+                        msg["contents"],
+                        msg["is_from_me"],
+                        msg["created_at"],
+                    )
+                    for msg in messages
+                ]
+
+                cursor.executemany(
+                    """
+                    INSERT INTO messages (message_id, user_id, contents, is_from_me, created_at)
+                    VALUES (?, ?, ?, ?, ?)
+                """,
+                    message_data,
+                )
+
+                inserted_count = cursor.rowcount
+                conn.commit()
+
+                logger.info(
+                    f"Inserted {inserted_count} messages into messages database"
+                )
+                return inserted_count
+
+        except sqlite3.Error as e:
+            logger.error(f"Error inserting messages batch: {e}")
+            return 0
+
+    def get_message_by_id(self, message_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Get a message by its ID
+
+        Args:
+            message_id: Numeric message ID to search for
+
+        Returns:
+            Message dictionary if found, None otherwise
+        """
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+
+                cursor.execute(
+                    """
+                    SELECT message_id, user_id, contents, is_from_me, created_at
+                    FROM messages WHERE message_id = ?
+                """,
+                    (message_id,),
+                )
+
+                row = cursor.fetchone()
+                if row:
+                    message_id, user_id, contents, is_from_me, created_at = row
+                    return {
+                        "message_id": message_id,
+                        "user_id": user_id,
+                        "contents": contents,
+                        "is_from_me": bool(is_from_me),
+                        "created_at": created_at,
+                    }
+
+                return None
+
+        except sqlite3.Error as e:
+            logger.error(f"Error getting message {message_id}: {e}")
+            return None
+
+    def get_messages_by_user(
+        self, user_id: str, limit: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Get messages for a specific user
+
+        Args:
+            user_id: User ID to get messages for
+            limit: Optional limit on number of messages to return
+
+        Returns:
+            List of message dictionaries
+        """
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+
+                query = """
+                    SELECT message_id, user_id, contents, is_from_me, created_at
+                    FROM messages WHERE user_id = ?
+                    ORDER BY created_at DESC
+                """
+                if limit:
+                    query += f" LIMIT {limit}"
+
+                cursor.execute(query, (user_id,))
+
+                messages = []
+                for row in cursor.fetchall():
+                    message_id, user_id, contents, is_from_me, created_at = row
+                    messages.append(
+                        {
+                            "message_id": message_id,
+                            "user_id": user_id,
+                            "contents": contents,
+                            "is_from_me": bool(is_from_me),
+                            "created_at": created_at,
+                        }
+                    )
+
+                return messages
+
+        except sqlite3.Error as e:
+            logger.error(f"Error getting messages for user {user_id}: {e}")
+            return []
+
+    def get_all_messages(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Get all messages from the database
+
+        Args:
+            limit: Optional limit on number of messages to return
+
+        Returns:
+            List of message dictionaries
+        """
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+
+                query = """
+                    SELECT message_id, user_id, contents, is_from_me, created_at
+                    FROM messages
+                    ORDER BY created_at DESC
+                """
+                if limit:
+                    query += f" LIMIT {limit}"
+
+                cursor.execute(query)
+
+                messages = []
+                for row in cursor.fetchall():
+                    message_id, user_id, contents, is_from_me, created_at = row
+                    messages.append(
+                        {
+                            "message_id": message_id,
+                            "user_id": user_id,
+                            "contents": contents,
+                            "is_from_me": bool(is_from_me),
+                            "created_at": created_at,
+                        }
+                    )
+
+                return messages
+
+        except sqlite3.Error as e:
+            logger.error(f"Error getting all messages: {e}")
+            return []
+
+    def clear_messages_table(self) -> bool:
+        """
+        Clear all messages from the messages table
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM messages")
+                conn.commit()
+
+                logger.info("Cleared all messages from messages table")
+                return True
+
+        except sqlite3.Error as e:
+            logger.error(f"Error clearing messages table: {e}")
+            return False
+
+    def insert_chat_message(
+        self, chat_id: int, message_id: int, message_date: str
+    ) -> bool:
+        """
+        Insert a chat-message relationship into the chat_messages table
+
+        Args:
+            chat_id: Integer chat ID
+            message_id: Integer message ID
+            message_date: Timestamp when the message was in the chat (ISO format)
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+
+                cursor.execute(
+                    """
+                    INSERT INTO chat_messages (chat_id, message_id, message_date)
+                    VALUES (?, ?, ?)
+                """,
+                    (chat_id, message_id, message_date),
+                )
+
+                conn.commit()
+                return True
+
+        except sqlite3.Error as e:
+            logger.error(f"Error inserting chat_message ({chat_id}, {message_id}): {e}")
+            return False
+
+    def insert_chat_messages_batch(self, chat_messages: List[Dict[str, Any]]) -> int:
+        """
+        Insert multiple chat-message relationships in a batch operation
+
+        Args:
+            chat_messages: List of dictionaries with keys:
+                          chat_id (int), message_id (int), message_date
+
+        Returns:
+            Number of chat-message relationships successfully inserted
+        """
+        if not chat_messages:
+            return 0
+
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+
+                # Prepare data for batch insert
+                chat_message_data = [
+                    (
+                        cm["chat_id"],
+                        cm["message_id"],
+                        cm["message_date"],
+                    )
+                    for cm in chat_messages
+                ]
+
+                cursor.executemany(
+                    """
+                    INSERT INTO chat_messages (chat_id, message_id, message_date)
+                    VALUES (?, ?, ?)
+                """,
+                    chat_message_data,
+                )
+
+                inserted_count = cursor.rowcount
+                conn.commit()
+
+                logger.info(
+                    f"Inserted {inserted_count} chat-message relationships into messages database"
+                )
+                return inserted_count
+
+        except sqlite3.Error as e:
+            logger.error(f"Error inserting chat_messages batch: {e}")
+            return 0
+
+    def get_messages_in_chat(
+        self, chat_id: int, limit: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Get all messages in a specific chat
+
+        Args:
+            chat_id: Integer chat ID to get messages for
+            limit: Optional limit on number of messages to return
+
+        Returns:
+            List of message dictionaries with chat context
+        """
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+
+                query = """
+                    SELECT m.message_id, m.user_id, m.contents, m.is_from_me, 
+                           m.created_at, cm.message_date
+                    FROM messages m
+                    JOIN chat_messages cm ON m.message_id = cm.message_id
+                    WHERE cm.chat_id = ?
+                    ORDER BY cm.message_date DESC
+                """
+                if limit:
+                    query += f" LIMIT {limit}"
+
+                cursor.execute(query, (chat_id,))
+
+                messages = []
+                for row in cursor.fetchall():
+                    message_id, user_id, contents, is_from_me, created_at, message_date = row
+                    messages.append(
+                        {
+                            "message_id": message_id,
+                            "user_id": user_id,
+                            "contents": contents,
+                            "is_from_me": bool(is_from_me),
+                            "created_at": created_at,
+                            "message_date": message_date,
+                            "chat_id": chat_id,
+                        }
+                    )
+
+                return messages
+
+        except sqlite3.Error as e:
+            logger.error(f"Error getting messages for chat {chat_id}: {e}")
+            return []
+
+    def get_chats_for_message(self, message_id: int) -> List[Dict[str, Any]]:
+        """
+        Get all chats that contain a specific message
+
+        Args:
+            message_id: Integer message ID to search for
+
+        Returns:
+            List of chat dictionaries
+        """
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+
+                cursor.execute(
+                    """
+                    SELECT c.chat_id, c.display_name, cm.message_date
+                    FROM chats c
+                    JOIN chat_messages cm ON c.chat_id = cm.chat_id
+                    WHERE cm.message_id = ?
+                    ORDER BY cm.message_date DESC
+                """,
+                    (message_id,),
+                )
+
+                chats = []
+                for row in cursor.fetchall():
+                    chat_id, display_name, message_date = row
+                    chats.append(
+                        {
+                            "chat_id": chat_id,
+                            "display_name": display_name,
+                            "message_date": message_date,
+                        }
+                    )
+
+                return chats
+
+        except sqlite3.Error as e:
+            logger.error(f"Error getting chats for message {message_id}: {e}")
+            return []
+
+    def clear_chat_messages_table(self) -> bool:
+        """
+        Clear all chat-message relationships
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM chat_messages")
+                conn.commit()
+
+                logger.info("Cleared all chat-message relationships")
+                return True
+
+        except sqlite3.Error as e:
+            logger.error(f"Error clearing chat_messages table: {e}")
+            return False
