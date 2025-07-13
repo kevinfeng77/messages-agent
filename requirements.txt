@@ -1,6 +1,15 @@
 # Core dependencies for Messages Agent
-# Note: This project only requires Python standard library
-# All dependencies below are for future AI integration
+# Note: Core messaging functionality requires additional dependencies
+
+# Message sending functionality
+py-imessage>=0.1.0     # iMessage sending capability (macOS only)
+pydantic>=2.0.0        # Data validation and settings management
+typing-extensions>=4.0.0  # Enhanced typing support
+
+# Testing and development
+pytest>=7.0.0          # Testing framework
+pytest-cov>=4.0.0      # Test coverage reporting
+pytest-asyncio>=0.21.0 # Async testing support
 
 # Future AI integration (optional)
 # openai>=1.0.0         # OpenAI API
