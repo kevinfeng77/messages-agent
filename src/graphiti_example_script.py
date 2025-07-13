@@ -22,7 +22,6 @@ from datetime import datetime, timezone
 from logging import INFO
 
 from dotenv import load_dotenv
-
 from graphiti_core import Graphiti
 from graphiti_core.nodes import EpisodeType
 from graphiti_core.search.search_config_recipes import NODE_HYBRID_SEARCH_RRF
