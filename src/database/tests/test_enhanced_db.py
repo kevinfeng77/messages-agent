@@ -7,8 +7,8 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from database_manager import DatabaseManager
-from logger_config import setup_logging
+from src.database.manager import DatabaseManager
+from src.utils.logger_config import setup_logging
 
 def test_enhanced_database_manager():
     """Test the enhanced database manager with text extraction"""

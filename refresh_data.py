@@ -5,12 +5,12 @@ import sys
 from pathlib import Path
 import shutil
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+# Add current directory to path for src package
+sys.path.insert(0, str(Path(__file__).parent))
 
-from database_manager import DatabaseManager
-from message_migration import migrate_database
-from logger_config import setup_logging
+from src.database.manager import DatabaseManager
+from src.database.message_migration import migrate_database
+from src.utils.logger_config import setup_logging
 
 def refresh_data_folder():
     """Clean up data folder and refresh with latest database"""
@@ -133,7 +133,7 @@ def refresh_data_folder():
     print("   • Backup files for safety")
     print()
     print("🔧 To use in your code:")
-    print("   from src.database_manager import DatabaseManager")
+    print("   from src.database.manager import DatabaseManager")
     print("   db = DatabaseManager()")
     print("   messages = db.extract_messages_with_text(limit=100)")
     print()
