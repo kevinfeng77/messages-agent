@@ -1,21 +1,30 @@
-# Messages Agent
+# Message Agent
 
-A Python tool that safely extracts messages from macOS Messages.app and maps them to real contact names from AddressBook for AI agent integration.
+An AI-powered communication assistant that analyzes message patterns, builds user profiles, and provides intelligent response suggestions. The system uses Graphiti for knowledge graph management and normalized database schemas for efficient data processing.
 
 ## 🚀 Key Features
 
-- **Safe Messages Database Access** - Never modifies original Messages database
-- **Complete Contact Mapping** - Maps phone numbers/emails to real contact names (94.2% success rate)
-- **Multi-Source Contact Search** - Searches iCloud, Google, Yahoo AddressBook sources
-- **Optimized Database Schema** - Single table with joined message + contact data
-- **Privacy-First Design** - Works entirely offline with local data
+- **Comprehensive Message Processing** - Extracts and processes messages from macOS Messages.app
+- **Normalized Database Architecture** - Clean schema with users, chats, messages, and relationships
+- **Privacy-First Design** - Works entirely offline with local data and encryption
+- **Graphiti Integration** - Knowledge graph management for user profiling and pattern analysis  
+- **Organized Codebase** - Modular structure with proper testing and validation
+- **Simplified Setup** - One-command setup using Just task runner
 
-## 📊 Results
+## 🏗️ Project Architecture
 
-- **223,951** total messages processed
-- **211,012** messages (94.2%) mapped to contact names
-- **110** distinct contacts identified
-- **Comprehensive contact data** from all AddressBook sources
+The Message Agent system spans 4 main phases:
+
+1. **Phase 1**: Data Preparation & Graphiti Integration
+2. **Phase 2**: Data Ingestion Pipeline  
+3. **Phase 3**: Intelligence Layer
+4. **Phase 4**: Live Response System
+
+### Technology Stack
+- **Backend**: Python with SQLite database management
+- **Database**: Normalized SQLite schema with proper indexing
+- **AI/ML**: Graphiti for knowledge graphs, message text decoding
+- **Infrastructure**: Organized script structure, comprehensive testing
 
 ## 🔧 Installation
 
@@ -32,85 +41,166 @@ A Python tool that safely extracts messages from macOS Messages.app and maps the
    pip install -r requirements.txt
    ```
 
-3. **Grant Full Disk Access** (Required for Messages database access):
+3. **Install Just task runner:**
+   ```bash
+   # On macOS with Homebrew
+   brew install just
+   
+   # Or follow installation instructions at https://github.com/casey/just
+   ```
+
+4. **Grant Full Disk Access** (Required for Messages database access):
    - Open System Preferences > Security & Privacy > Privacy > Full Disk Access
    - Add Terminal.app or your IDE (VS Code, PyCharm, etc.)
    - Restart your terminal/IDE after granting permissions
 
 ## 🎯 Usage
 
-### Quick Migration
-Run the complete migration to create a database with contact names:
+### Quick Setup
+Run the complete setup with a single command:
 
 ```bash
 # Activate virtual environment
 source venv/bin/activate
 
-# Run migration
-python migrate_database.py
+# Complete setup from clean state
+just setup
 ```
 
-This creates `data/messages_complete_contacts.db` with the complete dataset.
+This command will:
+1. Clean the data directory
+2. Copy the Messages database safely
+3. Create and populate the normalized messages.db
 
-### Database Schema
+### Available Commands
 
-The resulting database contains a single optimized table:
+```bash
+# Setup and data management
+just setup      # Complete setup from clean state
+just copy       # Copy Messages database only  
+just create     # Create and populate messages.db only
+just clean      # Clean data directory
 
+# Development and validation
+just test       # Run all tests
+just validate   # Run validation scripts
+just lint       # Run code quality checks
+just format     # Format code with black/isort
+just stats      # Show database statistics
+```
+
+## 📊 Database Schema
+
+The system uses a normalized database schema with four main tables:
+
+### Users Table
 ```sql
-CREATE TABLE messages_with_contacts (
-    -- Message data
-    message_id INTEGER,
-    text TEXT,
-    date INTEGER,
-    is_from_me INTEGER,
-    service TEXT,
-    
-    -- Contact data
-    phone_email TEXT,
-    contact_first_name TEXT,
-    contact_last_name TEXT,
-    contact_full_name TEXT,
-    
-    -- Metadata
-    created_at TIMESTAMP
+CREATE TABLE users (
+    user_id TEXT NOT NULL,
+    first_name TEXT NOT NULL, 
+    last_name TEXT NOT NULL,
+    phone_number TEXT NOT NULL,
+    email TEXT NOT NULL,
+    handle_id INTEGER
+);
+```
+
+### Chats Table  
+```sql
+CREATE TABLE chats (
+    chat_id INTEGER NOT NULL PRIMARY KEY,
+    display_name TEXT NOT NULL
+);
+```
+
+### Messages Table
+```sql
+CREATE TABLE messages (
+    message_id INTEGER NOT NULL PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    contents TEXT NOT NULL,
+    is_from_me BOOLEAN,
+    created_at TIMESTAMP NOT NULL
+);
+```
+
+### Junction Tables
+```sql
+-- Many-to-many: chats ↔ users
+CREATE TABLE chat_users (
+    chat_id INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
+    PRIMARY KEY (chat_id, user_id)
+);
+
+-- Many-to-many: chats ↔ messages  
+CREATE TABLE chat_messages (
+    chat_id INTEGER NOT NULL,
+    message_id INTEGER NOT NULL,
+    message_date TIMESTAMP NOT NULL,
+    PRIMARY KEY (chat_id, message_id)
 );
 ```
 
 ### Example Queries
 
 ```sql
--- Top contacts by message count
-SELECT contact_full_name, COUNT(*) as message_count 
-FROM messages_with_contacts 
-WHERE contact_full_name IS NOT NULL 
-GROUP BY contact_full_name 
-ORDER BY message_count DESC;
+-- Get all messages in a chat with user details
+SELECT m.contents, u.first_name, u.last_name, m.created_at
+FROM messages m
+JOIN users u ON m.user_id = u.user_id
+JOIN chat_messages cm ON m.message_id = cm.message_id
+WHERE cm.chat_id = 1
+ORDER BY m.created_at;
 
--- Recent messages with contact names
-SELECT contact_full_name, text, datetime(date/1000000000 + 978307200, 'unixepoch') as date
-FROM messages_with_contacts 
-WHERE contact_full_name IS NOT NULL 
-ORDER BY date DESC 
-LIMIT 10;
+-- Find all chats for a specific user
+SELECT c.display_name, c.chat_id
+FROM chats c
+JOIN chat_users cu ON c.chat_id = cu.chat_id
+WHERE cu.user_id = 'user123';
 ```
 
-## 📱 Database Viewing
-
-Use [TablePlus](https://tableplus.com/) or any SQLite browser to explore the data:
-- **Database Path:** `./data/messages_complete_contacts.db`
-- **Type:** SQLite
-
-## 🏗️ Project Structure
+## 📂 Project Structure
 
 ```
-messages-agent/
-├── src/
-│   ├── database_manager.py      # Safe Messages DB copying
-│   ├── database_migrator.py     # Contact name mapping
-│   └── logger_config.py         # Logging system
-├── migrate_database.py          # Main migration script
-├── requirements.txt             # Dependencies
-└── README.md                    # This file
+ai_text_agent/
+├── src/                          # Core application modules
+│   ├── database/                 # Database management
+│   │   ├── manager.py           # Original Messages DB copying
+│   │   ├── messages_db.py       # New normalized database
+│   │   ├── migrator.py          # Migration utilities
+│   │   └── tests/               # Database tests
+│   ├── extractors/              # Data extraction modules
+│   │   ├── addressbook_extractor.py  # Contact extraction
+│   │   └── tests/
+│   ├── graphiti/                # Knowledge graph integration
+│   │   ├── episode_manager.py   # Graphiti episodes
+│   │   ├── query_manager.py     # Graph queries
+│   │   └── tests/
+│   ├── messaging/               # Message processing
+│   │   ├── decoder.py           # Text decoding from binary
+│   │   └── tests/
+│   ├── user/                    # User management
+│   │   ├── user.py              # User model
+│   │   ├── handle_matcher.py    # Handle-to-user mapping
+│   │   └── tests/
+│   └── utils/                   # Shared utilities
+│       ├── logger_config.py     # Logging configuration
+│       └── tests/
+├── scripts/                     # Organized utility scripts
+│   ├── copy_messages_database.py    # Copy Messages DB
+│   ├── setup_messages_database.py  # Setup normalized DB
+│   ├── migration/               # Database migrations
+│   ├── validation/              # Validation scripts
+│   └── debug/                   # Debug utilities
+├── tests/                       # Integration tests
+├── data/                        # Generated databases
+│   ├── copy/                    # Messages database copy
+│   └── messages.db              # Normalized database
+├── logs/                        # Application logs
+├── justfile                     # Task runner commands
+├── CLAUDE.md                    # Project instructions for AI
+└── requirements.txt             # Python dependencies
 ```
 
 ## 🔒 Security & Privacy
@@ -119,26 +209,56 @@ messages-agent/
 - **Works with copies** in the `./data/` directory  
 - **Processes data locally** - no external API calls
 - **Respects user privacy** - all data stays on your machine
+- **Organized access patterns** - controlled through normalized schema
 
-## 🔧 Technical Details
+## 🛠️ Development
 
-### Contact Mapping Process
-1. **Extracts** all contacts from multiple AddressBook sources
-2. **Normalizes** phone numbers for consistent matching
-3. **Maps** Messages handles to real contact names
-4. **Creates** optimized database with joined data
+### Code Quality
+```bash
+# Format code
+just format
 
-### AddressBook Sources Searched
-- **iCloud Contacts** - `/Library/Application Support/AddressBook/Sources/[iCloud-ID]/`
-- **Google Contacts** - `/Library/Application Support/AddressBook/Sources/[Google-ID]/`
-- **Yahoo Contacts** - `/Library/Application Support/AddressBook/Sources/[Yahoo-ID]/`
+# Run linting
+just lint
+
+# Run tests  
+just test
+
+# Run validation
+just validate
+```
+
+### Database Management
+```bash
+# View database statistics
+just stats
+
+# Clean and recreate databases
+just clean setup
+```
 
 ## 🚧 Requirements
 
 - **macOS** (Messages.app and AddressBook required)
 - **Python 3.7+**
+- **Just task runner**
 - **Full Disk Access** permission
 - **Messages.app** with message history
+
+## 🧪 Testing
+
+The project includes comprehensive testing:
+
+- **Unit Tests**: Individual component testing
+- **Integration Tests**: Database and cross-component testing  
+- **Validation Scripts**: End-to-end workflow validation
+- **Performance Tests**: Database operation efficiency
+
+Run all tests with:
+```bash
+just test
+just validate
+```
 
 ## 🛠️ Troubleshooting
 
@@ -147,18 +267,24 @@ messages-agent/
 2. Restart Terminal/IDE after granting permissions
 3. Ensure Messages.app has been opened at least once
 
-### Low Contact Matching Rate
-- Check that contacts exist in AddressBook/Contacts.app
-- Verify phone numbers are properly formatted in contacts
-- Try running migration again after updating contacts
+### Setup Issues
+- Verify Just is installed: `just --version`
+- Check Python virtual environment is activated
+- Ensure all dependencies are installed: `pip install -r requirements.txt`
+
+### Database Issues
+- Clean and recreate: `just clean setup`
+- Check database file permissions in `./data/` directory
+- View statistics: `just stats`
 
 ## 📈 Future Enhancements
 
-This database is ready for:
-- **AI Response Generation** - Use contact names for personalized responses
-- **Conversation Analytics** - Analyze messaging patterns by contact
-- **Smart Notifications** - Context-aware message handling
-- **Message Search** - Enhanced search with contact names
+This system is designed for:
+- **AI Response Generation** - Contextual response suggestions using Graphiti
+- **Conversation Analytics** - Advanced messaging pattern analysis
+- **Real-time Processing** - Live message interception and processing
+- **Multi-platform Support** - Extension to other messaging platforms
+- **Advanced Privacy Controls** - Enhanced encryption and data protection
 
 ## 📄 License
 
