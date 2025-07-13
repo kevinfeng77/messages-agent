@@ -41,7 +41,7 @@ class MessagesTableMigrator:
     ):
         self.source_db_path = Path(source_db_path)
         self.target_db_path = Path(target_db_path)
-        self.db_manager = DatabaseManager(str(self.source_db_path))
+        # Don't use DatabaseManager for migration - just access the database directly
         self.messages_db = MessagesDatabase(str(self.target_db_path))
 
     def validate_source_database(self) -> bool:

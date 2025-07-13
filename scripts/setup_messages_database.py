@@ -21,7 +21,7 @@ from typing import Dict, List, Tuple, Optional
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.database.manager import DatabaseManager
-from src.database.messages_db import MessagesDatabase
+from src.database.messages_db import MessagesDatabase  
 from src.extractors.addressbook_extractor import AddressBookExtractor
 from src.user.handle_matcher import HandleMatcher
 from src.utils.logger_config import get_logger
@@ -358,7 +358,7 @@ def main():
     # Step 5: Process handles from Messages database
     print("\n6. Processing handles from Messages database...")
 
-    chat_db_path = "./data/copy/chat_copy.db"
+    chat_db_path = "./data/chat_copy.db"
     handles = extract_handles_from_messages_db(chat_db_path)
 
     if not handles:

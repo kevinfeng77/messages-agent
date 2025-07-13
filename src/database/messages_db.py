@@ -4,8 +4,8 @@ import sqlite3
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 
-from user.user import User
-from utils.logger_config import get_logger
+from src.user.user import User
+from src.utils.logger_config import get_logger
 
 logger = get_logger(__name__)
 
