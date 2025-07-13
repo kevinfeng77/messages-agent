@@ -2,8 +2,8 @@
 
 import logging
 import plistlib
-from typing import Optional, Dict, Any
 import struct
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
