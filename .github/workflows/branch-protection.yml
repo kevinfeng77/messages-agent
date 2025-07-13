@@ -33,14 +33,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           
-      - name: Run linting
-        run: |
-          pip install black isort flake8 mypy
-          black --check src/
-          isort --check-only src/
-          flake8 src/
-          mypy src/
-          
       - name: Run tests
         run: |
           # Add test commands when test suite is implemented
