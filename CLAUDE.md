@@ -298,18 +298,26 @@ mcp__github__create_pull_request(
 - Consistent API interface across all operations
 - Better error messages and debugging capabilities
 
-### Linting & Quality
+### Linting & Quality (MANDATORY BEFORE PR)
 ```bash
-# Format code
+# Format code (REQUIRED)
 black src/
 isort src/
 
-# Type checking
+# Type checking (REQUIRED)
 mypy src/
 
-# Linting
+# Linting (REQUIRED)
 flake8 src/
+
+# Verify all checks pass locally before pushing
+black --check src/ && isort --check-only src/ && flake8 src/ && mypy src/
 ```
+
+**MANDATORY Pre-Push Checks:**
+- All linting tools must pass before pushing changes
+- Use the verification command above to ensure GitHub Actions will pass
+- Never push code that fails local linting checks
 
 ## Linear Project Mapping
 
