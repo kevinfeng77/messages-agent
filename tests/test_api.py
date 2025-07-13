@@ -198,7 +198,7 @@ class TestGenerateMessageResponsesFunction:
         # Verify
         assert result == mock_response
         mock_service_class.assert_called_once_with()
-        mock_service.generate_message_responses.assert_called_once_with(self.valid_request)
+        mock_service.generate_message_responses.assert_called_once_with(self.valid_request, 2000)
     
     @patch('src.message_maker.api.MessageMakerService')
     def test_generate_message_responses_function_error_propagation(self, mock_service_class):
@@ -211,6 +211,27 @@ class TestGenerateMessageResponsesFunction:
         # Execute and verify error is propagated
         with pytest.raises(ValueError, match="Invalid input"):
             generate_message_responses(self.valid_request)
+
+    @patch('src.message_maker.api.MessageMakerService')
+    def test_generate_message_responses_function_with_custom_context_limit(self, mock_service_class):
+        """Test the standalone function with custom max_context_messages parameter."""
+        # Setup mock
+        mock_service = Mock()
+        mock_response = MessageResponse(
+            response_1="Response 1",
+            response_2="Response 2", 
+            response_3="Response 3"
+        )
+        mock_service.generate_message_responses.return_value = mock_response
+        mock_service_class.return_value = mock_service
+        
+        # Execute with custom context limit
+        result = generate_message_responses(self.valid_request, max_context_messages=500)
+        
+        # Verify
+        assert result == mock_response
+        mock_service_class.assert_called_once_with()
+        mock_service.generate_message_responses.assert_called_once_with(self.valid_request, 500)
 
 
 class TestIntegrationScenarios:
