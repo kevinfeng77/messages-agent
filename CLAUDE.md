@@ -1,5 +1,64 @@
 # Message Agent Project - Claude Instructions
 
+## CRITICAL: Always Create Feature Branch First
+
+**MANDATORY FIRST STEP for ANY Linear ticket work:**
+
+### Standard Workflow: Git Worktree (MANDATORY)
+Before implementing ANY Linear ticket, you MUST create a new worktree:
+
+1. **Ensure main repository has latest changes:**
+   ```bash
+   # From main repository directory
+   git checkout main
+   git pull origin main
+   ```
+
+2. **Create new worktree with feature branch from latest main:**
+   ```bash
+   git worktree add ../message-agent-{ticket-description} -b kevin/{description-of-changes}
+   cd ../message-agent-{ticket-description}
+   ```
+
+### Alternative: Traditional Branch Workflow (Only if worktrees unavailable)
+If git worktrees are not available, fall back to standard branching:
+
+1. **Switch to main and pull latest changes:**
+   ```bash
+   git checkout main
+   git pull origin main
+   ```
+
+2. **Create new feature branch from latest main:**
+   ```bash
+   git checkout -b kevin/{description-of-changes}
+   ```
+
+3. **List and manage worktrees:**
+   ```bash
+   git worktree list              # Show all worktrees
+   git worktree remove ../path    # Remove completed worktree
+   git worktree prune            # Clean up stale worktree metadata
+   ```
+
+**Worktree Benefits:**
+- Work on multiple tickets simultaneously without context switching
+- Isolate development environments
+- Run tests in parallel
+- Review PRs in separate directories
+
+**Example worktree names:**
+- `../message-agent-structure-fix`
+- `../message-agent-neo4j-setup`
+- `../message-agent-pr-review`
+
+**Example branch names:**
+- `kevin/message-maker-structure-fix`
+- `kevin/person-entity-schema`
+- `kevin/neo4j-setup`
+
+**NEVER work directly on main or existing branches for new tickets - this step is NON-NEGOTIABLE.**
+
 ## Project Overview
 This is the Message Agent system - an AI-powered communication assistant that analyzes message patterns, builds user profiles, and provides intelligent response suggestions. The system uses Graphiti for knowledge graph management and spans 4 main phases:
 
