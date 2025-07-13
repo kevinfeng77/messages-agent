@@ -1,52 +1,48 @@
 # Migration Scripts
 
-This folder contains database migration scripts for updating the Message Agent database schema and migrating data between versions.
+This folder contains database migration scripts for the Message Agent system.
+
+**Note (SERENE-49)**: Most migration functionality has been consolidated into the streamlined setup process. This directory now contains only the core messages table migration logic used by the setup script.
 
 ## Scripts
 
-### `migrate_add_handle_id_column.py`
-Adds the `handle_id` column to existing users tables:
-- Safely adds the column without data loss
-- Creates appropriate indexes for performance
-- Handles cases where column already exists
-
-### `migrate_chats.py`
-Migrates chat data from Messages database to normalized structure:
-- Extracts chats and handles from Messages database
-- Maps handle_ids to user_ids using existing users table
-- Creates normalized chats and chat_users tables
-- Validates migration completeness
-
-### `migrate_database.py`
-Performs comprehensive database migrations:
-- Migrates Messages database to include contact information
-- Joins message data with contact names from address book
-- Creates denormalized tables for efficient querying
+### `migrate_messages_table.py`
+Core messages table migration functionality:
+- Extracts messages from Messages database with text decoding
+- Migrates chats, messages, and chat-message relationships  
+- Handles batch processing for large datasets
+- Used internally by the streamlined setup script
 
 ## Usage
 
-Run migration scripts from the project root:
+These migration scripts are primarily used internally by the main setup process:
 
 ```bash
-# Add handle_id column to existing database
-python scripts/migration/migrate_add_handle_id_column.py
+# Use the streamlined setup instead of individual migrations
+just setup
 
-# Migrate chat data from Messages database
-python scripts/migration/migrate_chats.py
-
-# Perform full database migration with contacts
-python scripts/migration/migrate_database.py
+# Or call setup script directly
+python scripts/setup_messages_database.py
 ```
+
+## Migration Logic Now in Setup
+
+The following migration functionality has been moved to `setup_messages_database.py`:
+
+- **Handle ID Management**: Users table creation with handle_id column
+- **Chat Migration**: Extraction and normalization of chat data
+- **User Matching**: Handle-to-user mapping and relationship creation
+- **Data Population**: Complete database population from Messages database
 
 ## Safety Features
 
-- **Backup Creation**: All migrations create database backups before proceeding
-- **Rollback Support**: Failed migrations can be rolled back
-- **Idempotent Operations**: Safe to run multiple times
-- **Schema Validation**: Verifies schema before and after migration
+- **Fresh Database Creation**: Setup creates clean database from scratch
+- **Comprehensive Validation**: Built-in test case validation
+- **Error Handling**: Robust error handling throughout process
+- **Statistical Reporting**: Detailed success metrics and coverage reports
 
 ## When to Use
 
-- **Schema Updates**: When updating existing installations with new database columns
-- **Data Migration**: When moving from old database formats to new ones
-- **Contact Integration**: When adding contact resolution to existing message databases
+- **Fresh Setup**: Use `just setup` for new installations
+- **Development**: Core migration logic is in `migrate_messages_table.py`
+- **Custom Implementations**: Extend migration logic for specific use cases
