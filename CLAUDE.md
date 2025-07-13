@@ -1,5 +1,64 @@
 # Message Agent Project - Claude Instructions
 
+## CRITICAL: Always Create Feature Branch First
+
+**MANDATORY FIRST STEP for ANY Linear ticket work:**
+
+### Standard Workflow: Git Worktree (MANDATORY)
+Before implementing ANY Linear ticket, you MUST create a new worktree:
+
+1. **Ensure main repository has latest changes:**
+   ```bash
+   # From main repository directory
+   git checkout main
+   git pull origin main
+   ```
+
+2. **Create new worktree with feature branch from latest main:**
+   ```bash
+   git worktree add ../message-agent-{ticket-description} -b kevin/{description-of-changes}
+   cd ../message-agent-{ticket-description}
+   ```
+
+### Alternative: Traditional Branch Workflow (Only if worktrees unavailable)
+If git worktrees are not available, fall back to standard branching:
+
+1. **Switch to main and pull latest changes:**
+   ```bash
+   git checkout main
+   git pull origin main
+   ```
+
+2. **Create new feature branch from latest main:**
+   ```bash
+   git checkout -b kevin/{description-of-changes}
+   ```
+
+3. **List and manage worktrees:**
+   ```bash
+   git worktree list              # Show all worktrees
+   git worktree remove ../path    # Remove completed worktree
+   git worktree prune            # Clean up stale worktree metadata
+   ```
+
+**Worktree Benefits:**
+- Work on multiple tickets simultaneously without context switching
+- Isolate development environments
+- Run tests in parallel
+- Review PRs in separate directories
+
+**Example worktree names:**
+- `../message-agent-structure-fix`
+- `../message-agent-neo4j-setup`
+- `../message-agent-pr-review`
+
+**Example branch names:**
+- `kevin/message-maker-structure-fix`
+- `kevin/person-entity-schema`
+- `kevin/neo4j-setup`
+
+**NEVER work directly on main or existing branches for new tickets - this step is NON-NEGOTIABLE.**
+
 ## Project Overview
 This is the Message Agent system - an AI-powered communication assistant that analyzes message patterns, builds user profiles, and provides intelligent response suggestions. The system uses Graphiti for knowledge graph management and spans 4 main phases:
 
@@ -25,24 +84,35 @@ When you receive a Linear ticket link or ID:
 ```markdown
 ## Auto-Plan Generation Protocol
 
-1. **Fetch Ticket Details**
-   - Use `mcp__linear__get_issue` with the ticket ID (e.g., "SERENE-46")
-   - Extract: title, description, estimate, priority, project context
-   - Example: `mcp__linear__get_issue(id="SERENE-46")`
+1. **Extract Ticket ID**
+   - From URL format `https://linear.app/serene-ai/issue/SERENE-XX/...` extract "SERENE-XX"
+   - Accept direct ticket IDs like "SERENE-46" as well
 
-2. **Analyze Technical Context**
+2. **Fetch Ticket Details**
+   - Use `mcp__linear__get_issue` with the extracted ticket ID
+   - Example: `mcp__linear__get_issue(id="SERENE-46")`
+   - **CRITICAL ERROR HANDLING**: 
+     - If Linear MCP server is unavailable: STOP and inform user
+     - If ticket ID is invalid/not found: STOP and inform user
+     - If authentication fails: STOP and inform user
+     - If any other access error occurs: STOP and inform user
+   - **DO NOT PROCEED** without successful ticket access
+   - Request user to provide ticket details manually if access fails
+   - Extract: title, description, estimate, priority, project context
+
+3. **Analyze Technical Context**
    - Identify which phase/component this task belongs to
    - Review related database schemas and existing codebase
    - Consider dependencies and integration points
 
-3. **Generate Implementation Plan**
+4. **Generate Implementation Plan**
    - Break down into 3-7 concrete steps
    - Include technical approach and architecture decisions
    - Specify files to create/modify
    - Identify testing requirements
    - Note any dependencies or blockers
 
-4. **Present Plan Structure**
+5. **Present Plan Structure**
    ```
    # Implementation Plan: [Task Title]
    
@@ -67,18 +137,18 @@ When you receive a Linear ticket link or ID:
    [Definition of done]
    ```
 
-5. **Create Feature Branch**
+6. **Create Feature Branch**
    - ALWAYS create a new branch for each Linear ticket
    - Use naming convention: `kevin/{ticket-description}`
    - Branch from main/master before starting implementation
    - Example: `git checkout -b kevin/refactor-directory-tree`
 
-6. **Await Confirmation**
+7. **Await Confirmation**
    - Present plan for review
    - Allow for modifications and refinement
    - Proceed with implementation once approved
 
-7. **Implementation Completion**
+8. **Implementation Completion**
    - Always create comprehensive test suite
    - Run validation scripts
    - Create PR automatically using GitHub MCP
@@ -320,6 +390,85 @@ git pull origin main
 git branch -d kevin/{description}
 ```
 
+### Git Worktrees for Parallel Development
+
+**Git worktrees enable working on multiple branches simultaneously without stashing or switching contexts.**
+
+#### When to Use Git Worktrees
+- **Hotfix Development**: Work on urgent fixes while maintaining progress on feature branches
+- **Code Reviews**: Check out PR branches in separate directories for IDE-based review
+- **Experimentation**: Test new approaches without disrupting main development workflow
+- **Parallel Features**: Develop multiple features concurrently without context switching
+
+#### Worktree Management Commands
+```bash
+# List all worktrees
+git worktree list
+
+# Add worktree for existing branch
+git worktree add ../message-agent-feature feature-branch-name
+
+# Add worktree and create new branch
+git worktree add -b kevin/new-feature ../message-agent-new-feature
+
+# Add worktree for hotfix from main
+git worktree add -b kevin/hotfix-urgent ../message-agent-hotfix main
+
+# Remove completed worktree
+git worktree remove ../message-agent-feature
+
+# Clean up stale worktree metadata
+git worktree prune
+```
+
+#### Recommended Directory Structure
+```
+parent-directory/
+├── message-agent/              # Main development directory
+├── message-agent-hotfix/       # Hotfix worktree
+├── message-agent-review/       # PR review worktree
+└── message-agent-experimental/ # Experimental feature worktree
+```
+
+#### Worktree Workflow Best Practices
+1. **Consistent Naming**: Use `{repo-name}-{purpose}` pattern for worktree directories
+2. **Regular Updates**: Keep worktrees synchronized with remote changes:
+   ```bash
+   # In each worktree directory
+   git fetch origin
+   git pull origin main  # or relevant base branch
+   ```
+3. **Clean Commits**: Always commit or stash changes before switching between worktrees
+4. **Strategic Cleanup**: Remove worktrees promptly after branch merging to avoid clutter
+5. **Branch Tracking**: Ensure each worktree branch tracks appropriate remote branch:
+   ```bash
+   git branch --set-upstream-to=origin/feature-branch
+   ```
+
+#### Advanced Worktree Workflows
+```bash
+# Create worktree for PR review
+git fetch origin pull/123/head:pr-123
+git worktree add ../message-agent-pr123 pr-123
+
+# Cherry-pick commits between worktrees
+cd ../message-agent-feature
+git cherry-pick <commit-hash-from-other-worktree>
+
+# Create experimental worktree from current branch
+git worktree add -b kevin/experiment ../message-agent-experiment
+
+# Worktree for database migration testing
+git worktree add -b kevin/migration-test ../message-agent-migration
+```
+
+#### Integration with Message Agent Development
+- **Phase Development**: Use separate worktrees for each development phase
+- **Database Testing**: Isolate database migration testing in dedicated worktrees  
+- **Graphiti Experiments**: Test knowledge graph changes without affecting main development
+- **API Development**: Parallel development of different API endpoints
+- **Performance Testing**: Dedicated worktree for performance optimization work
+
 ### GitHub MCP Workflow (PREFERRED METHOD)
 **ALWAYS use GitHub MCP tools instead of external CLI tools:**
 
@@ -346,6 +495,45 @@ mcp__github__create_pull_request(
 - Integrated authentication and error handling
 - Consistent API interface across all operations
 - Better error messages and debugging capabilities
+
+### GitHub Actions & Branch Protection
+
+**All PRs must pass automated tests before merging via GitHub Actions workflow.**
+
+#### Required Status Checks
+The repository uses a GitHub Actions workflow (`.github/workflows/test.yml`) that runs:
+
+1. **Test Suite**: `just test` - Runs all unit and integration tests
+2. **Dependencies**: Automatic installation of testing dependencies
+
+**Note**: Code formatting, linting, and validation scripts are currently disabled pending setup fixes.
+
+#### Workflow Triggers
+- **Pull Requests**: All PRs to `main` or `master` branches
+- **Direct Pushes**: Commits pushed directly to `main` or `master`
+
+#### Branch Protection Rules
+Configure the following branch protection rules in GitHub repository settings:
+- **Require status checks to pass**: Enable for the "Tests" workflow
+- **Require branches to be up to date**: Ensure PRs include latest main changes
+- **Include administrators**: Apply rules to repository administrators
+- **Restrict pushes**: Only allow merges through pull requests
+
+#### Workflow Configuration
+```yaml
+# .github/workflows/test.yml
+name: Tests
+on:
+  pull_request:
+    branches: [ main, master ]
+  push:
+    branches: [ main, master ]
+```
+
+**This ensures no code reaches main without:**
+- ✅ All tests passing (`just test`)
+
+**Note**: Code formatting, linting, and validation checks will be added to CI once properly configured.
 
 ### Linting & Quality (MANDATORY BEFORE PR)
 ```bash
@@ -448,6 +636,11 @@ black --check src/ && isort --check-only src/ && flake8 src/ && mypy src/
 - **MANDATORY**: Use GitHub MCP for all GitHub operations
 - **MANDATORY**: Create validation scripts for major features
 - **MANDATORY**: Include performance metrics in PRs
+- **CRITICAL LINEAR ERROR HANDLING**: NEVER proceed if Linear ticket access fails
+  - If `mcp__linear__get_issue` fails for any reason, STOP immediately
+  - Inform user of the specific error and request manual ticket details
+  - Do not guess or assume ticket content
+  - Do not proceed with partial information
 - **Always check existing code** before implementing new functionality
 - **Use the Linear MCP server** to get full context on related tickets
 - **Consider the broader system architecture** when making implementation decisions

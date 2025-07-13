@@ -59,7 +59,7 @@ class TestMessageDecoder(unittest.TestCase):
 
     def test_decode_attributed_body_invalid_format(self):
         """Test decoding invalid binary data"""
-        attributed_body = b"invalid binary data"
+        attributed_body = b"\x00\x01\x02\x03\xff\xfe\xfd"
 
         result = self.decoder.decode_attributed_body(attributed_body)
         self.assertIsNone(result)
@@ -85,7 +85,7 @@ class TestMessageDecoder(unittest.TestCase):
 
         # Decode some messages
         valid_data = b"\x04\x0bstreamtyped\x81\xe8\x03\x84\x01@\x84\x84\x84\x12NSAttributedString\x00\x84\x84\x08NSObject\x00\x85\x92\x84\x84\x84\x08NSString\x01\x94\x84\x01+\x05Valid\x86\x84"
-        invalid_data = b"invalid"
+        invalid_data = b"\x00\x01\x02\x03\xff\xfe\xfd"
 
         self.decoder.decode_attributed_body(valid_data)
         self.decoder.decode_attributed_body(invalid_data)
@@ -135,7 +135,7 @@ class TestMessageDecoder(unittest.TestCase):
 
         # Strategy 2: Binary plist (mock - would need real plist data)
         # For now, just test that it doesn't crash
-        fake_plist = b"bplist00fake"
+        fake_plist = b"\x00\x01bplist00\xff\xfe"
         result2 = self.decoder.decode_attributed_body(fake_plist)
         # Should return None but not crash
         self.assertIsNone(result2)

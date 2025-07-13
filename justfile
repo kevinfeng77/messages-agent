@@ -10,7 +10,9 @@ default:
     @echo "  just copy       - Copy Messages database only"
     @echo "  just create     - Create and populate messages.db only"
     @echo "  just clean      - Clean data directory"
-    @echo "  just test       - Run all tests"
+    @echo "  just test       - Run all tests (pytest if available, unittest fallback)"
+    @echo "  just test-unit  - Run tests with unittest"
+    @echo "  just test-install - Install testing dependencies"
     @echo "  just validate   - Run validation scripts"
 
 # Complete setup: clean data, copy database, create and populate messages.db
@@ -40,7 +42,24 @@ clean:
 # Run all tests
 test:
     @echo "🧪 Running all tests..."
-    python -m pytest tests/ -v
+    @if command -v pytest >/dev/null 2>&1; then \
+        echo "Using pytest..."; \
+        python -m pytest tests/ -v; \
+    else \
+        echo "pytest not found, using unittest..."; \
+        echo "To install pytest: pip install -r requirements.txt"; \
+        python -m unittest discover tests/ -v; \
+    fi
+
+# Run tests with unittest (fallback option)
+test-unit:
+    @echo "🧪 Running tests with unittest..."
+    python -m unittest discover tests/ -v
+
+# Install testing dependencies
+test-install:
+    @echo "📦 Installing testing dependencies..."
+    pip install pytest>=7.0.0 pytest-cov>=4.0.0 pytest-xdist>=3.0.0
 
 # Run validation scripts
 validate:

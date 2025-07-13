@@ -12,12 +12,14 @@ from messaging.decoder import MessageDecoder
 
 def test_target_message():
     """Test that ROWID 224717 decodes correctly"""
+    import pytest
+    
     print("Testing target message ROWID 224717...")
     
     db_path = Path('./data/copy/chat_copy.db')
     if not db_path.exists():
         print("SKIP: Original database not found")
-        return True
+        pytest.skip("Original database not found")
     
     conn = sqlite3.connect(str(db_path))
     cursor = conn.cursor()
@@ -28,30 +30,30 @@ def test_target_message():
     
     if not result or not result[0]:
         print("SKIP: ROWID 224717 not found")
-        return True
+        pytest.skip("ROWID 224717 not found")
     
     attributed_body = result[0]
     decoder = MessageDecoder()
     decoded_text = decoder.decode_attributed_body(attributed_body)
     
     expected = "Me always the luckiest ever"
-    success = decoded_text == expected
     
     print(f"Expected: {repr(expected)}")
     print(f"Got: {repr(decoded_text)}")
-    print(f"Result: {'PASS' if success else 'FAIL'}")
     
-    return success
+    assert decoded_text == expected, f"Expected {repr(expected)} but got {repr(decoded_text)}"
 
 
 def test_regression_cases():
     """Test that existing functionality still works"""
+    import pytest
+    
     print("\nTesting regression protection...")
     
     db_path = Path('./data/copy/chat_copy.db')
     if not db_path.exists():
         print("SKIP: Original database not found")
-        return True
+        pytest.skip("Original database not found")
     
     conn = sqlite3.connect(str(db_path))
     cursor = conn.cursor()
@@ -67,6 +69,9 @@ def test_regression_cases():
     
     results = cursor.fetchall()
     conn.close()
+    
+    if not results:
+        pytest.skip("No messages with attributedBody found for testing")
     
     decoder = MessageDecoder()
     successful = 0
@@ -85,7 +90,7 @@ def test_regression_cases():
     success_rate = (successful / total * 100) if total > 0 else 0
     print(f"Regression test: {successful}/{total} successful ({success_rate:.1f}%)")
     
-    return success_rate >= 80  # At least 80% should work
+    assert success_rate >= 80, f"Regression test failed: only {success_rate:.1f}% success rate (expected ≥80%)"
 
 
 def test_decoder_stats():
@@ -101,8 +106,13 @@ def test_decoder_stats():
     stats = decoder.get_decode_stats()
     print(f"Decoder stats: {stats}")
     
-    # Basic smoke test
-    return stats['total_attempts'] > 0
+    # Basic smoke test - should have attempted at least one decode
+    assert stats['total_attempts'] > 0, f"Expected at least 1 decode attempt, got {stats['total_attempts']}"
+    
+    # Verify stats structure is correct
+    required_keys = ['success_count', 'failure_count', 'total_attempts', 'success_rate_percent']
+    for key in required_keys:
+        assert key in stats, f"Missing required stat key: {key}"
 
 
 def main():
