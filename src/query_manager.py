@@ -9,13 +9,13 @@ with predefined recipes.
 import asyncio
 import logging
 import os
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
 from graphiti_core import Graphiti
-from graphiti_core.search.search_config_recipes import NODE_HYBRID_SEARCH_RRF
 from graphiti_core.edges import Edge
 from graphiti_core.nodes import Node
+from graphiti_core.search.search_config_recipes import NODE_HYBRID_SEARCH_RRF
 
 # Configure logging
 logging.basicConfig(
