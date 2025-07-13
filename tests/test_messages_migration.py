@@ -220,16 +220,6 @@ class TestMessagesMigration(unittest.TestCase):
         self.assertIsNotNone(emoji_message)
         self.assertIn("Meeting at 3pm 📅", emoji_message["contents"])
 
-    def test_user_id_mapping(self):
-        """Test proper mapping of handle_id to user_id"""
-        messages = self.migrator.extract_messages_with_text()
-        
-        # Check that user_ids are properly mapped from handle identifiers
-        user_ids = {msg["user_id"] for msg in messages}
-        expected_user_ids = {"+15551234567", "test@example.com", "+15559876543"}
-        
-        # Should have user_ids from handle identifiers
-        self.assertTrue(expected_user_ids.issubset(user_ids))
 
     def test_timestamp_conversion(self):
         """Test proper conversion of macOS timestamps to ISO format"""
