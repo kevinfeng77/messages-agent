@@ -4,6 +4,7 @@ import pytest
 import unittest.mock as mock
 from unittest.mock import Mock, patch
 import sqlite3
+from datetime import datetime
 
 from src.message_maker.api import MessageMakerService, generate_message_responses
 from src.message_maker.types import MessageRequest, MessageResponse, ChatMessage, NewMessage, LLMPromptData
@@ -14,22 +15,25 @@ class TestMessageMakerService:
     
     def setup_method(self):
         """Set up test fixtures."""
-        self.service = MessageMakerService()
         self.valid_request = MessageRequest(
             chat_id=123,
             user_id="test_user",
             contents="Hello world"
         )
     
-    def test_init_with_default_db_path(self):
+    @patch('src.message_maker.api.LLMClient')
+    def test_init_with_default_db_path(self, mock_llm_client_class):
         """Test service initialization with default database path."""
+        mock_llm_client_class.return_value = Mock()
         service = MessageMakerService()
         assert service.db_path == "./data/messages.db"
         assert service.llm_client is not None
         assert service.logger is not None
     
-    def test_init_with_custom_db_path(self):
+    @patch('src.message_maker.api.LLMClient')
+    def test_init_with_custom_db_path(self, mock_llm_client_class):
         """Test service initialization with custom database path."""
+        mock_llm_client_class.return_value = Mock()
         custom_path = "/custom/path/messages.db"
         service = MessageMakerService(db_path=custom_path)
         assert service.db_path == custom_path
@@ -40,8 +44,8 @@ class TestMessageMakerService:
         """Test successful message response generation."""
         # Setup mocks
         mock_chat_history = [
-            ChatMessage(content="Hi there", is_from_me=False, timestamp="2023-01-01 10:00:00"),
-            ChatMessage(content="Hello!", is_from_me=True, timestamp="2023-01-01 10:01:00")
+            ChatMessage(contents="Hi there", is_from_me=False, created_at="2023-01-01T10:00:00Z"),
+            ChatMessage(contents="Hello!", is_from_me=True, created_at="2023-01-01T10:01:00Z")
         ]
         mock_get_chat_history.return_value = mock_chat_history
         
@@ -55,7 +59,8 @@ class TestMessageMakerService:
         mock_llm_client_class.return_value = mock_llm_client
         
         # Execute
-        result = self.service.generate_message_responses(self.valid_request)
+        service = MessageMakerService()
+        result = service.generate_message_responses(self.valid_request)
         
         # Verify
         assert isinstance(result, MessageResponse)
@@ -74,9 +79,10 @@ class TestMessageMakerService:
         call_args = mock_llm_client.generate_responses.call_args[0][0]
         assert isinstance(call_args, LLMPromptData)
         assert call_args.chat_history == mock_chat_history
-        assert call_args.new_message.content == "Hello world"
+        assert call_args.new_message.contents == "Hello world"
     
-    def test_generate_message_responses_invalid_input(self):
+    @patch('src.message_maker.api.LLMClient')
+    def test_generate_message_responses_invalid_input(self, mock_llm_client_class):
         """Test response generation with invalid input."""
         invalid_request = MessageRequest(
             chat_id=-1,  # Invalid chat_id
@@ -85,9 +91,11 @@ class TestMessageMakerService:
         )
         
         with pytest.raises(ValueError, match="chat_id must be a positive integer"):
-            self.service.generate_message_responses(invalid_request)
+            service = MessageMakerService()
+            service.generate_message_responses(invalid_request)
     
-    def test_generate_message_responses_empty_user_id(self):
+    @patch('src.message_maker.api.LLMClient')
+    def test_generate_message_responses_empty_user_id(self, mock_llm_client_class):
         """Test response generation with empty user_id."""
         invalid_request = MessageRequest(
             chat_id=123,
@@ -96,9 +104,11 @@ class TestMessageMakerService:
         )
         
         with pytest.raises(ValueError, match="user_id must be a non-empty string"):
-            self.service.generate_message_responses(invalid_request)
+            service = MessageMakerService()
+            service.generate_message_responses(invalid_request)
     
-    def test_generate_message_responses_empty_contents(self):
+    @patch('src.message_maker.api.LLMClient')
+    def test_generate_message_responses_empty_contents(self, mock_llm_client_class):
         """Test response generation with empty contents."""
         invalid_request = MessageRequest(
             chat_id=123,
@@ -107,15 +117,18 @@ class TestMessageMakerService:
         )
         
         with pytest.raises(ValueError, match="contents must be a non-empty string"):
-            self.service.generate_message_responses(invalid_request)
+            service = MessageMakerService()
+            service.generate_message_responses(invalid_request)
     
     @patch('src.message_maker.api.get_chat_history_for_message_generation')
-    def test_generate_message_responses_database_error(self, mock_get_chat_history):
+    @patch('src.message_maker.api.LLMClient')
+    def test_generate_message_responses_database_error(self, mock_llm_client_class, mock_get_chat_history):
         """Test response generation with database error."""
         mock_get_chat_history.side_effect = sqlite3.Error("Database connection failed")
         
         with pytest.raises(Exception, match="Database error"):
-            self.service.generate_message_responses(self.valid_request)
+            service = MessageMakerService()
+            service.generate_message_responses(self.valid_request)
     
     @patch('src.message_maker.api.get_chat_history_for_message_generation')
     @patch('src.message_maker.api.LLMClient')
@@ -128,7 +141,8 @@ class TestMessageMakerService:
         mock_llm_client_class.return_value = mock_llm_client
         
         with pytest.raises(Exception, match="LLM API error"):
-            self.service.generate_message_responses(self.valid_request)
+            service = MessageMakerService()
+            service.generate_message_responses(self.valid_request)
     
     @patch('src.message_maker.api.get_chat_history_for_message_generation')
     @patch('src.message_maker.api.LLMClient')
@@ -146,7 +160,8 @@ class TestMessageMakerService:
         mock_llm_client_class.return_value = mock_llm_client
         
         # Execute
-        result = self.service.generate_message_responses(self.valid_request)
+        service = MessageMakerService()
+        result = service.generate_message_responses(self.valid_request)
         
         # Verify it still works with empty history
         assert isinstance(result, MessageResponse)
@@ -207,9 +222,9 @@ class TestIntegrationScenarios:
         """Test a typical conversation flow with realistic chat history."""
         # Setup realistic chat history
         mock_chat_history = [
-            ChatMessage(content="Hey, are you free for lunch tomorrow?", is_from_me=False, timestamp="2023-01-01 09:00:00"),
-            ChatMessage(content="Yeah! What time works for you?", is_from_me=True, timestamp="2023-01-01 09:05:00"),
-            ChatMessage(content="How about 12:30 at that new Italian place?", is_from_me=False, timestamp="2023-01-01 09:10:00")
+            ChatMessage(contents="Hey, are you free for lunch tomorrow?", is_from_me=False, created_at="2023-01-01T09:00:00Z"),
+            ChatMessage(contents="Yeah! What time works for you?", is_from_me=True, created_at="2023-01-01T09:05:00Z"),
+            ChatMessage(contents="How about 12:30 at that new Italian place?", is_from_me=False, created_at="2023-01-01T09:10:00Z")
         ]
         mock_get_chat_history.return_value = mock_chat_history
         
