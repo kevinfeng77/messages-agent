@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 # Add the src directory to the path so we can import our modules
-sys.path.append(str(Path(__file__).parent.parent))
+sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from src.database.messages_db import MessagesDatabase
 from src.utils.logger_config import get_logger

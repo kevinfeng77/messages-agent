@@ -345,7 +345,7 @@ class TestChatMigrationIntegration(unittest.TestCase):
     def test_migration_with_users(self):
         """Test full migration process with user mapping"""
         # Import here to avoid circular imports in test setup
-        from scripts.migrate_chats import ChatMigrator
+        from scripts.migration.migrate_chats import ChatMigrator
 
         # Create test users
         self._create_test_users()
@@ -370,7 +370,7 @@ class TestChatMigrationIntegration(unittest.TestCase):
 
     def test_migration_stats(self):
         """Test migration statistics generation"""
-        from scripts.migrate_chats import ChatMigrator
+        from scripts.migration.migrate_chats import ChatMigrator
 
         self._create_test_users()
 
@@ -387,13 +387,13 @@ class TestChatMigrationIntegration(unittest.TestCase):
 
     def test_validation_script(self):
         """Test the validation script functionality"""
-        from scripts.validate_chat_migration import ChatMigrationValidator
+        from scripts.validation.validate_chat_migration import ChatMigrationValidator
 
         # Set up data
         self._create_test_users()
 
         # Run migration first
-        from scripts.migrate_chats import ChatMigrator
+        from scripts.migration.migrate_chats import ChatMigrator
 
         migrator = ChatMigrator(self.source_db_path, self.target_db_path)
         migrator.migrate_chats()

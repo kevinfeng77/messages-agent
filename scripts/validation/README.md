@@ -17,6 +17,13 @@ General implementation validation:
 - Tests data extraction and processing
 - Verifies database operations
 
+### `validate_chat_migration.py`
+Validates the chat migration process and results:
+- Verifies migration completeness and accuracy
+- Validates specific test cases (e.g., Quantabes chat requirements)
+- Tests normalized structure and junction table integrity
+- Provides detailed migration statistics
+
 ### `validate_messages_database.py`
 Validates the messages database setup and integrity:
 - Checks database schema correctness
@@ -28,6 +35,9 @@ Validates the messages database setup and integrity:
 Run validation scripts from the project root:
 
 ```bash
+# Validate chat migration results
+python scripts/validation/validate_chat_migration.py
+
 # Validate handle_id implementation
 python scripts/validation/validate_handle_id_implementation.py
 
