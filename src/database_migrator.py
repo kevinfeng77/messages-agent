@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Database Migration Script - Creates joined messages/contacts database"""
 
-import sqlite3
 import os
+import sqlite3
 import sys
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
