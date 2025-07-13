@@ -384,15 +384,17 @@ black --check src/ && isort --check-only src/ && flake8 src/ && mypy src/
    - Verify success criteria are met
    - Test edge cases and error conditions
 
-6. **PR Creation (Use GitHub MCP)**
+6. **PR Creation (Use GitHub MCP) - MANDATORY**
+   - **ALWAYS create PR when implementation checklist is completed**
    - Commit all changes with descriptive messages
-   - Push branch to origin
+   - Push branch to origin: `git push -u origin kevin/{branch-name}`
    - Use `mcp__github__create_pull_request` to create PR
    - Include comprehensive description with:
      - Problem statement and solution
      - Performance metrics and validation results  
      - Testing checklist (all items checked)
      - Impact and value delivered
+   - **Remember**: PR creation is not optional - it's required for every completed ticket
 
 7. **Documentation**
    - Update relevant documentation
@@ -413,6 +415,7 @@ black --check src/ && isort --check-only src/ && flake8 src/ && mypy src/
 - **All Tests Passing**: 100% test success required
 - **Code Coverage**: Minimum 80% for new code
 - **Linear Link**: Always link to originating ticket
+- **MANDATORY**: Always create PR when checklist is completed
 
 ## Notes for Claude
 
