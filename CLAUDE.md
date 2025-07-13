@@ -156,6 +156,12 @@ When you receive a Linear ticket link or ID:
    - Run validation scripts
    - Create PR automatically using GitHub MCP
    - Include performance metrics and validation results
+
+9. **Adhere Strictly to Specifications**
+   - **ONLY implement what is specified** in the Linear ticket
+   - Write minimal, concise code that satisfies the exact requirements
+   - **DO NOT add extra features, optimizations, or functionality** beyond the scope
+   - Focus on meeting the defined success criteria, nothing more
 ```
 
 ## Project Context & Architecture
