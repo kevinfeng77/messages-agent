@@ -1,16 +1,16 @@
 """Message Migration - Update existing databases with decoded text"""
 
-import sqlite3
 import logging
 import shutil
-from pathlib import Path
-from typing import Optional, Dict, Any
+import sqlite3
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 try:
-    from .message_decoder import extract_message_text, MessageDecoder
+    from .message_decoder import MessageDecoder, extract_message_text
 except ImportError:
-    from message_decoder import extract_message_text, MessageDecoder
+    from message_decoder import MessageDecoder, extract_message_text
 
 logger = logging.getLogger(__name__)
 
