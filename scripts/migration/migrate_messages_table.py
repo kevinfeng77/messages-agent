@@ -156,8 +156,8 @@ class MessagesTableMigrator:
                     else:
                         created_at = datetime.now().isoformat()
 
-                    # Use handle_identifier as user_id, or generate one if missing
-                    user_id = handle_identifier if handle_identifier else f"unknown_user_{handle_id}"
+                    # Map handle_id to our user_id from the users table
+                    user_id = self._map_handle_to_user_id(handle_id)
 
                     message_data = {
                         "message_id": int(message_id),
@@ -175,6 +175,31 @@ class MessagesTableMigrator:
         except sqlite3.Error as e:
             logger.error(f"Error extracting messages from source database: {e}")
             return []
+
+    def _map_handle_to_user_id(self, handle_id: Optional[int]) -> str:
+        """
+        Map a handle_id from the Messages database to our user_id
+
+        Args:
+            handle_id: Handle ID from Messages database (can be None)
+
+        Returns:
+            Mapped user_id or fallback identifier
+        """
+        if handle_id is None:
+            return "unknown_user_none"
+
+        try:
+            # Look up the user_id from our users table using handle_id
+            user = self.messages_db.get_user_by_handle_id(handle_id)
+            if user:
+                return user.user_id
+            else:
+                # Fallback to handle_id if no mapping found
+                return f"unknown_user_{handle_id}"
+        except Exception as e:
+            logger.warning(f"Error mapping handle_id {handle_id} to user_id: {e}")
+            return f"unknown_user_{handle_id}"
 
     def migrate_messages(self, batch_size: int = 1000, limit: Optional[int] = None) -> bool:
         """
@@ -225,6 +250,197 @@ class MessagesTableMigrator:
 
         except Exception as e:
             logger.error(f"Error during message migration: {e}")
+            return False
+
+    def extract_chat_messages_with_dates(self) -> List[Dict[str, Any]]:
+        """
+        Extract chat-message relationships from source database
+
+        Returns:
+            List of chat-message relationship dictionaries
+        """
+        try:
+            with sqlite3.connect(str(self.source_db_path)) as conn:
+                cursor = conn.cursor()
+
+                # Query to get chat-message relationships
+                query = """
+                    SELECT 
+                        cmj.chat_id,
+                        cmj.message_id,
+                        cmj.message_date
+                    FROM chat_message_join cmj
+                    ORDER BY cmj.message_date DESC
+                """
+
+                cursor.execute(query)
+                raw_chat_messages = cursor.fetchall()
+
+                logger.info(f"Extracted {len(raw_chat_messages)} chat-message relationships from source database")
+
+                # Process chat-message relationships
+                chat_messages = []
+                for row in raw_chat_messages:
+                    chat_id, message_id, message_date = row
+
+                    # Convert macOS timestamp to ISO format (same logic as messages)
+                    if message_date:
+                        try:
+                            # Convert nanoseconds to seconds since 2001-01-01
+                            seconds_since_2001 = message_date / 1_000_000_000
+                            # Add offset from 2001-01-01 to 1970-01-01 (Unix epoch)
+                            unix_timestamp = seconds_since_2001 + 978307200
+                            # Validate timestamp is reasonable (between 1970 and 2100)
+                            if 0 <= unix_timestamp <= 4102444800:  # 2100-01-01
+                                formatted_date = datetime.fromtimestamp(unix_timestamp).isoformat()
+                            else:
+                                # Use current time for invalid timestamps
+                                formatted_date = datetime.now().isoformat()
+                        except (OSError, ValueError, OverflowError):
+                            # Handle invalid timestamp values
+                            formatted_date = datetime.now().isoformat()
+                    else:
+                        formatted_date = datetime.now().isoformat()
+
+                    chat_message_data = {
+                        "chat_id": int(chat_id),
+                        "message_id": int(message_id),
+                        "message_date": formatted_date,
+                    }
+
+                    chat_messages.append(chat_message_data)
+
+                logger.info(f"Successfully processed {len(chat_messages)} chat-message relationships")
+                return chat_messages
+
+        except sqlite3.Error as e:
+            logger.error(f"Error extracting chat-message relationships from source database: {e}")
+            return []
+
+    def migrate_chat_messages(self, batch_size: int = 1000) -> bool:
+        """
+        Migrate chat-message relationships from source to target database
+
+        Args:
+            batch_size: Number of relationships to process in each batch
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Clear existing chat-message relationships
+            self.messages_db.clear_chat_messages_table()
+
+            # Extract chat-message relationships
+            logger.info("Extracting chat-message relationships from source database...")
+            chat_messages = self.extract_chat_messages_with_dates()
+
+            if not chat_messages:
+                logger.warning("No chat-message relationships found to migrate")
+                return True
+
+            # Insert chat-message relationships in batches
+            total_inserted = 0
+            for i in range(0, len(chat_messages), batch_size):
+                batch = chat_messages[i : i + batch_size]
+                inserted_count = self.messages_db.insert_chat_messages_batch(batch)
+                total_inserted += inserted_count
+
+                logger.info(
+                    f"Processed chat-message batch {i//batch_size + 1}: "
+                    f"inserted {inserted_count}/{len(batch)} relationships"
+                )
+
+            logger.info(f"Chat-message migration completed successfully: {total_inserted} relationships migrated")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error during chat-message migration: {e}")
+            return False
+
+    def extract_chats(self) -> List[Dict[str, Any]]:
+        """
+        Extract chats from source database
+
+        Returns:
+            List of chat dictionaries
+        """
+        try:
+            with sqlite3.connect(str(self.source_db_path)) as conn:
+                cursor = conn.cursor()
+
+                # Query to get chats
+                query = """
+                    SELECT 
+                        c.ROWID as chat_id,
+                        c.display_name
+                    FROM chat c
+                    ORDER BY c.ROWID
+                """
+
+                cursor.execute(query)
+                raw_chats = cursor.fetchall()
+
+                logger.info(f"Extracted {len(raw_chats)} chats from source database")
+
+                # Process chats
+                chats = []
+                for row in raw_chats:
+                    chat_id, display_name = row
+
+                    chat_data = {
+                        "chat_id": int(chat_id),
+                        "display_name": display_name or f"Chat {chat_id}",
+                    }
+
+                    chats.append(chat_data)
+
+                logger.info(f"Successfully processed {len(chats)} chats")
+                return chats
+
+        except sqlite3.Error as e:
+            logger.error(f"Error extracting chats from source database: {e}")
+            return []
+
+    def migrate_chats(self, batch_size: int = 1000) -> bool:
+        """
+        Migrate chats from source to target database
+
+        Args:
+            batch_size: Number of chats to process in each batch
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Clear existing chats (this will cascade to chat_users and chat_messages)
+            self.messages_db.clear_chats_table()
+
+            # Extract chats
+            logger.info("Extracting chats from source database...")
+            chats = self.extract_chats()
+
+            if not chats:
+                logger.warning("No chats found to migrate")
+                return True
+
+            # Insert chats in batches
+            total_inserted = 0
+            for i in range(0, len(chats), batch_size):
+                batch = chats[i : i + batch_size]
+                inserted_count = self.messages_db.insert_chats_batch(batch)
+                total_inserted += inserted_count
+
+                logger.info(
+                    f"Processed chats batch {i//batch_size + 1}: "
+                    f"inserted {inserted_count}/{len(batch)} chats"
+                )
+
+            logger.info(f"Chats migration completed successfully: {total_inserted} chats migrated")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error during chats migration: {e}")
             return False
 
     def get_migration_stats(self) -> Dict[str, Any]:

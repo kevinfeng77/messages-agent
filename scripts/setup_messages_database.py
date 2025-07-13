@@ -264,21 +264,45 @@ def populate_messages_table(db_path: str, chat_db_path: str) -> Dict[str, int]:
         pre_stats = migrator.get_migration_stats()
         logger.info(f"Pre-migration: {pre_stats['source_stats']['messages_with_text']} messages with text in source")
         
+        # First migrate chats
+        logger.info("Migrating chats...")
+        chats_success = migrator.migrate_chats(batch_size=1000)
+        
+        if not chats_success:
+            logger.error("Chats migration failed")
+            return {"error": "Chats migration failed", "messages_migrated": 0}
+            
         # Run the migration with reasonable batch size and no limit
         success = migrator.migrate_messages(batch_size=1000, limit=None)
         
         if not success:
             logger.error("Messages table migration failed")
             return {"error": "Migration failed", "messages_migrated": 0}
+            
+        # Also migrate chat-message relationships
+        logger.info("Migrating chat-message relationships...")
+        chat_messages_success = migrator.migrate_chat_messages(batch_size=1000)
+        
+        if not chat_messages_success:
+            logger.error("Chat-message relationships migration failed")
+            return {"error": "Chat-message migration failed", "messages_migrated": 0}
         
         # Get post-migration stats
         post_stats = migrator.get_migration_stats()
         messages_migrated = post_stats['target_stats']['total_messages']
         
-        logger.info(f"Successfully migrated {messages_migrated} messages to messages table")
+        # Get chat and chat-message relationship counts
+        chats = migrator.extract_chats()
+        chats_count = len(chats)
+        chat_messages = migrator.extract_chat_messages_with_dates()
+        chat_messages_count = len(chat_messages)
+        
+        logger.info(f"Successfully migrated {chats_count} chats, {messages_migrated} messages and {chat_messages_count} chat-message relationships")
         
         return {
+            "chats_migrated": chats_count,
             "messages_migrated": messages_migrated,
+            "chat_messages_migrated": chat_messages_count,
             "source_messages": pre_stats['source_stats']['messages_with_text'],
             "migration_coverage": post_stats['target_stats']['total_messages'] / max(pre_stats['source_stats']['messages_with_text'], 1)
         }
@@ -399,13 +423,17 @@ def main():
         print(f"❌ Messages table population failed: {messages_stats['error']}")
         return False
     
+    chats_migrated = messages_stats.get("chats_migrated", 0)
     messages_migrated = messages_stats.get("messages_migrated", 0)
+    chat_messages_migrated = messages_stats.get("chat_messages_migrated", 0)
     source_messages = messages_stats.get("source_messages", 0)
     coverage = messages_stats.get("migration_coverage", 0) * 100
     
     print(f"✅ Messages table population completed:")
     print(f"   - Source messages with text: {source_messages}")
+    print(f"   - Chats migrated: {chats_migrated}")
     print(f"   - Messages migrated: {messages_migrated}")
+    print(f"   - Chat-message relationships migrated: {chat_messages_migrated}")
     print(f"   - Migration coverage: {coverage:.1f}%")
 
     # Step 9: Final database statistics
