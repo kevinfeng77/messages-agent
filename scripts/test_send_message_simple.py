@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Simple message sending test script.
-Prompts for a phone number and message, then sends it using the messaging service.
+Simple message sending test script using AppleScript (py-imessage has bugs).
 """
 
 import asyncio
@@ -17,8 +16,8 @@ from messaging.config import MessageConfig
 
 async def main():
     """Main function to test message sending."""
-    print("📱 Message Agent - Send Test Message")
-    print("=" * 40)
+    print("📱 Message Agent - Send Test Message (AppleScript)")
+    print("=" * 50)
     
     try:
         # Get recipient from user
@@ -37,9 +36,9 @@ async def main():
         print(f"💬 Message: {message}")
         print("\n⏳ Sending...")
         
-        # Create service and send message
+        # Create service (uses AppleScript, not py-imessage)
         config = MessageConfig(
-            require_imessage_enabled=False,  # Allow fallback modes
+            require_imessage_enabled=False,  # Use AppleScript (py-imessage has bugs)
             log_message_content=True,
             log_recipients=True
         )

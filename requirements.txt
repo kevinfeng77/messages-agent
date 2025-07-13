@@ -1,8 +1,7 @@
 # Core dependencies for Messages Agent
 
 # Messaging services
-py-imessage>=1.0.0     # Python iMessage interface (primary)
-# Note: Also uses native AppleScript integration as fallback
+# Note: Uses native AppleScript integration (py-imessage has bugs)
 
 # Data validation and settings management
 pydantic>=2.0.0        # Data validation and settings management

@@ -17,7 +17,6 @@ from datetime import datetime, timedelta
 from .config import MessageConfig, config
 from .applescript_service import AppleScriptMessageService
 from .exceptions import (
-    MessagingError,
     MessageValidationError,
     RecipientValidationError,
     MessageSendError,
@@ -101,30 +100,25 @@ class MessageService:
         self._init_messaging_services()
     
     def _init_messaging_services(self):
-        """Initialize py-imessage and AppleScript messaging services."""
-        # Try to initialize py-imessage first
-        try:
-            from py_imessage import imessage
-            self._imessage_client = imessage
-            logger.info("py-imessage client initialized successfully")
-        except Exception as e:
-            logger.warning(f"py-imessage initialization failed: {e}")
-            self._imessage_client = None
+        """Initialize AppleScript messaging service (py-imessage has bugs)."""
+        # py-imessage has bugs - concatenates phone number and message
+        self._imessage_client = None
+        logger.info("py-imessage disabled due to JavaScript bugs")
         
-        # Initialize AppleScript messaging service as fallback
+        # Initialize AppleScript messaging service as primary
         try:
             self._applescript_service = AppleScriptMessageService(self.config)
             if self._applescript_service.is_available():
                 logger.info("AppleScript messaging service initialized successfully")
             else:
                 logger.warning("AppleScript messaging service not available")
-                if self.config.require_imessage_enabled and self._imessage_client is None:
-                    raise ServiceUnavailableError("No messaging service available")
+                if self.config.require_imessage_enabled:
+                    raise ServiceUnavailableError("AppleScript messaging service not available")
                 self._applescript_service = None
         except Exception as e:
             logger.error(f"AppleScript service failed to initialize: {e}")
-            if self.config.require_imessage_enabled and self._imessage_client is None:
-                raise ServiceUnavailableError(f"No messaging service available: {e}")
+            if self.config.require_imessage_enabled:
+                raise ServiceUnavailableError(f"AppleScript messaging service unavailable: {e}")
             self._applescript_service = None
     
     def validate_recipient(self, recipient: str) -> bool:
@@ -202,68 +196,21 @@ class MessageService:
         start_time = time.time()
         
         try:
-            # Try py-imessage first
-            if self._imessage_client is not None:
-                try:
-                    result = self._imessage_client.send(recipient, content)
-                    # py-imessage.send() returns True on success, not a message ID
-                    if result:
-                        message_id = f"py_imessage_{int(time.time())}"
-                        logger.info(f"Message sent via py-imessage: {message_id}")
-                        
-                        duration = time.time() - start_time
-                        
-                        return MessageResult(
-                            success=True,
-                            message_id=message_id,
-                            timestamp=datetime.now(),
-                            duration_seconds=duration
-                        )
-                    else:
-                        raise MessageSendError("py-imessage send returned False")
-                    
-                except Exception as e:
-                    logger.warning(f"py-imessage failed, trying AppleScript fallback: {e}")
-                    # Fall through to AppleScript
-            
-            # Try AppleScript fallback
+            # Use AppleScript service (py-imessage has bugs)
             if self._applescript_service is not None:
-                try:
-                    message_id = await self._applescript_service.send_message(recipient, content)
-                    logger.info(f"Message sent via AppleScript fallback: {message_id}")
-                    
-                    duration = time.time() - start_time
-                    
-                    return MessageResult(
-                        success=True,
-                        message_id=message_id,
-                        timestamp=datetime.now(),
-                        duration_seconds=duration
-                    )
-                    
-                except Exception as e:
-                    logger.warning(f"AppleScript service also failed: {e}")
-                    # Fall through to mock mode
-            
-            # Mock mode if both services unavailable
-            if self.config.log_recipients and self.config.log_message_content:
-                logger.info(f"Mock send to {recipient}: {content[:50]}...")
-            elif self.config.log_recipients:
-                logger.info(f"Mock send to {recipient}")
-            elif self.config.log_message_content:
-                logger.info(f"Mock send: {content[:50]}...")
+                message_id = await self._applescript_service.send_message(recipient, content)
+                logger.info(f"Message sent via AppleScript: {message_id}")
+                
+                duration = time.time() - start_time
+                
+                return MessageResult(
+                    success=True,
+                    message_id=message_id,
+                    timestamp=datetime.now(),
+                    duration_seconds=duration
+                )
             else:
-                logger.info("Mock send completed")
-            
-            message_id = f"mock_{int(time.time())}"
-            duration = time.time() - start_time
-            
-            return MessageResult(
-                success=True,
-                message_id=message_id,
-                timestamp=datetime.now(),
-                duration_seconds=duration
-            )
+                raise ServiceUnavailableError("AppleScript service not available")
             
         except Exception as e:
             duration = time.time() - start_time
