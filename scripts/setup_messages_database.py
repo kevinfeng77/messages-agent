@@ -26,6 +26,10 @@ from src.extractors.addressbook_extractor import AddressBookExtractor
 from src.user.handle_matcher import HandleMatcher
 from src.utils.logger_config import get_logger
 
+# Import the messages table migrator
+sys.path.append(str(Path(__file__).parent / "migration"))
+from migrate_messages_table import MessagesTableMigrator
+
 logger = get_logger(__name__)
 
 
@@ -236,6 +240,54 @@ def validate_test_cases(messages_db: MessagesDatabase) -> Dict[str, bool]:
     return validation_results
 
 
+def populate_messages_table(db_path: str, chat_db_path: str) -> Dict[str, int]:
+    """
+    Populate the messages table from the Messages database
+    
+    Args:
+        db_path: Path to the messages.db database
+        chat_db_path: Path to the Messages database copy
+        
+    Returns:
+        Dictionary with population statistics
+    """
+    logger.info("Starting messages table population...")
+    
+    try:
+        # Initialize the migrator
+        migrator = MessagesTableMigrator(
+            source_db_path=chat_db_path,
+            target_db_path=db_path
+        )
+        
+        # Get pre-migration stats
+        pre_stats = migrator.get_migration_stats()
+        logger.info(f"Pre-migration: {pre_stats['source_stats']['messages_with_text']} messages with text in source")
+        
+        # Run the migration with reasonable batch size and no limit
+        success = migrator.migrate_messages(batch_size=1000, limit=None)
+        
+        if not success:
+            logger.error("Messages table migration failed")
+            return {"error": "Migration failed", "messages_migrated": 0}
+        
+        # Get post-migration stats
+        post_stats = migrator.get_migration_stats()
+        messages_migrated = post_stats['target_stats']['total_messages']
+        
+        logger.info(f"Successfully migrated {messages_migrated} messages to messages table")
+        
+        return {
+            "messages_migrated": messages_migrated,
+            "source_messages": pre_stats['source_stats']['messages_with_text'],
+            "migration_coverage": post_stats['target_stats']['total_messages'] / max(pre_stats['source_stats']['messages_with_text'], 1)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error during messages table population: {e}")
+        return {"error": str(e), "messages_migrated": 0}
+
+
 def main():
     """Main setup function for messages database"""
     print("=== Complete Messages Database Setup ===\n")
@@ -339,8 +391,25 @@ def main():
     print(f"   - Allison Shi test case: {'✅ PASS' if allison_pass else '❌ FAIL'}")
     print(f"   - Wayne Ellerbe test case: {'✅ PASS' if wayne_pass else '❌ FAIL'}")
 
-    # Step 7: Final database statistics
-    print("\n8. Final database statistics:")
+    # Step 7: Populate messages table
+    print("\n8. Populating messages table...")
+    messages_stats = populate_messages_table(db_path, chat_db_path)
+    
+    if "error" in messages_stats:
+        print(f"❌ Messages table population failed: {messages_stats['error']}")
+        return False
+    
+    messages_migrated = messages_stats.get("messages_migrated", 0)
+    source_messages = messages_stats.get("source_messages", 0)
+    coverage = messages_stats.get("migration_coverage", 0) * 100
+    
+    print(f"✅ Messages table population completed:")
+    print(f"   - Source messages with text: {source_messages}")
+    print(f"   - Messages migrated: {messages_migrated}")
+    print(f"   - Migration coverage: {coverage:.1f}%")
+
+    # Step 9: Final database statistics
+    print("\n9. Final database statistics:")
     db_stats = messages_db.get_database_stats()
 
     # Calculate handle-specific stats
@@ -357,6 +426,7 @@ def main():
 
     print(f"   - Users With Handle Id: {users_with_handle_id}")
     print(f"   - Users Without Handle Id: {users_without_handle_id}")
+    print(f"   - Messages In Table: {messages_migrated}")
 
     # Success summary
     all_critical_passed = allison_pass and wayne_pass
@@ -369,7 +439,9 @@ def main():
     print(f"\n🎉 Complete messages database setup finished!")
     print(f"   Database location: {db_path}")
     print(f"   Total users: {db_stats['total_users']}")
+    print(f"   Total messages: {messages_migrated}")
     print(f"   Handle processing success rate: {success_rate:.1f}%")
+    print(f"   Messages migration coverage: {coverage:.1f}%")
     print(
         f"   Test cases: {'✅ All passed' if all_critical_passed else '⚠️ Some failed'}"
     )
