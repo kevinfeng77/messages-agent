@@ -175,6 +175,11 @@ All branches should follow the pattern: `kevin/{description-of-changes-in-few-wo
 **PR Process:**
 1. **Create Feature Branch**
    ```bash
+   # Switch to main and pull latest changes
+   git checkout main
+   git pull origin main
+   
+   # Create new feature branch from latest main
    git checkout -b kevin/{short-description}
    ```
 
@@ -255,7 +260,11 @@ python -m uvicorn main:app --reload
 
 ### Git Commands
 ```bash
-# Create and switch to feature branch
+# Switch to main and pull latest changes
+git checkout main
+git pull origin main
+
+# Create and switch to feature branch from latest main
 git checkout -b kevin/{description}
 
 # Add and commit changes
