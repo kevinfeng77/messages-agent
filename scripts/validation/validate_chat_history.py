@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-End-to-end validation script for chat history retrieval functionality.
+End-to-end validation script for the core chat history retrieval function.
 
-This script validates the complete chat history retrieval system including:
+This script validates the get_chat_history_for_message_generation function including:
 - Database setup and data integrity
-- Chat history service functionality
+- Core function functionality
 - Performance characteristics with realistic data volumes
 - Edge case handling and error scenarios
 """
@@ -17,13 +17,14 @@ import sqlite3
 from pathlib import Path
 from typing import List, Dict, Any
 from datetime import datetime, timedelta
+from unittest.mock import patch
 
 # Add the project root to the path
 project_root = Path(__file__).parent.parent.parent
 sys.path.append(str(project_root))
 
 from src.database.messages_db import MessagesDatabase
-from src.message_maker.chat_history import ChatHistoryService
+from src.message_maker.chat_history import get_chat_history_for_message_generation
 from src.message_maker.types import ChatMessage
 from src.user.user import User
 from src.utils.logger_config import get_logger
@@ -32,7 +33,7 @@ logger = get_logger(__name__)
 
 
 class ChatHistoryValidator:
-    """Validator for chat history retrieval functionality."""
+    """Validator for the core chat history retrieval function."""
 
     def __init__(self):
         """Initialize validator with temporary database."""
@@ -41,7 +42,6 @@ class ChatHistoryValidator:
         self.db_path = self.temp_db.name
         
         self.messages_db = MessagesDatabase(self.db_path)
-        self.chat_service = ChatHistoryService(self.db_path)
         
         self.validation_results = {
             "tests_passed": 0,
@@ -212,36 +212,40 @@ class ChatHistoryValidator:
         logger.info("Testing basic functionality...")
         
         try:
-            # Test 1: Retrieve chat history for existing chat
-            messages = self.chat_service.get_chat_history_for_message_generation("1001", "alice123")
-            self.log_test_result(
-                "Basic retrieval", 
-                len(messages) == 50,
-                f"Retrieved {len(messages)} messages"
-            )
+            # Mock the database path for testing
+            with patch('src.message_maker.chat_history.Path') as mock_path:
+                mock_path.return_value = Path(self.db_path)
+                
+                # Test 1: Retrieve chat history for existing chat
+                messages = get_chat_history_for_message_generation("1001", "alice123")
+                self.log_test_result(
+                    "Basic retrieval", 
+                    len(messages) == 50,
+                    f"Retrieved {len(messages)} messages"
+                )
 
-            # Test 2: Verify chronological order
-            is_chronological = all(
-                messages[i].created_at <= messages[i+1].created_at 
-                for i in range(len(messages)-1)
-            )
-            self.log_test_result("Chronological order", is_chronological)
+                # Test 2: Verify chronological order
+                is_chronological = all(
+                    messages[i].created_at <= messages[i+1].created_at 
+                    for i in range(len(messages)-1)
+                )
+                self.log_test_result("Chronological order", is_chronological)
 
-            # Test 3: Verify is_from_me logic
-            alice_messages = [msg for msg in messages if msg.is_from_me]
-            bob_messages = [msg for msg in messages if not msg.is_from_me]
-            
-            # Should have roughly equal numbers (given our test data pattern)
-            ratio_valid = 0.4 <= len(alice_messages) / len(messages) <= 0.6
-            self.log_test_result(
-                "is_from_me logic", 
-                ratio_valid,
-                f"Alice: {len(alice_messages)}, Bob: {len(bob_messages)}"
-            )
+                # Test 3: Verify is_from_me logic
+                alice_messages = [msg for msg in messages if msg.is_from_me]
+                bob_messages = [msg for msg in messages if not msg.is_from_me]
+                
+                # Should have roughly equal numbers (given our test data pattern)
+                ratio_valid = 0.4 <= len(alice_messages) / len(messages) <= 0.6
+                self.log_test_result(
+                    "is_from_me logic", 
+                    ratio_valid,
+                    f"Alice: {len(alice_messages)}, Bob: {len(bob_messages)}"
+                )
 
-            # Test 4: Empty chat handling
-            empty_messages = self.chat_service.get_chat_history_for_message_generation("1003", "alice123")
-            self.log_test_result("Empty chat handling", len(empty_messages) == 0)
+                # Test 4: Empty chat handling
+                empty_messages = get_chat_history_for_message_generation("1003", "alice123")
+                self.log_test_result("Empty chat handling", len(empty_messages) == 0)
 
             return True
 
@@ -256,33 +260,16 @@ class ChatHistoryValidator:
         try:
             # Test 1: Invalid chat_id format
             try:
-                self.chat_service.get_chat_history_for_message_generation("invalid", "alice123")
+                get_chat_history_for_message_generation("invalid", "alice123")
                 self.log_test_result("Invalid chat_id handling", False, "Should have raised ValueError")
             except ValueError:
                 self.log_test_result("Invalid chat_id handling", True)
 
             # Test 2: Nonexistent chat
-            messages = self.chat_service.get_chat_history_for_message_generation("99999", "alice123")
-            self.log_test_result("Nonexistent chat handling", len(messages) == 0)
-
-            # Test 3: Chat existence check
-            exists = self.chat_service.chat_exists("1001")
-            not_exists = not self.chat_service.chat_exists("99999")
-            self.log_test_result("Chat existence check", exists and not_exists)
-
-            # Test 4: Message count
-            count = self.chat_service.get_message_count("1001")
-            self.log_test_result("Message count", count == 50)
-
-            # Test 5: Chat participants
-            participants = self.chat_service.get_chat_participants("1001")
-            expected_participants = {"alice123", "bob456"}
-            actual_participants = set(participants)
-            self.log_test_result(
-                "Chat participants", 
-                actual_participants == expected_participants,
-                f"Expected: {expected_participants}, Got: {actual_participants}"
-            )
+            with patch('src.message_maker.chat_history.Path') as mock_path:
+                mock_path.return_value = Path(self.db_path)
+                messages = get_chat_history_for_message_generation("99999", "alice123")
+                self.log_test_result("Nonexistent chat handling", len(messages) == 0)
 
             return True
 
@@ -295,49 +282,38 @@ class ChatHistoryValidator:
         logger.info("Testing performance...")
         
         try:
-            # Test 1: Full chat retrieval performance (100 messages)
-            start_time = time.time()
-            messages = self.chat_service.get_chat_history_for_message_generation("1002", "alice123")
-            full_retrieval_time = time.time() - start_time
-            
-            self.validation_results["performance_metrics"]["full_retrieval_100_messages"] = full_retrieval_time
-            
-            performance_ok = full_retrieval_time < 1.0  # Should be under 1 second
-            self.log_test_result(
-                "Full retrieval performance",
-                performance_ok,
-                f"{full_retrieval_time:.3f}s for {len(messages)} messages"
-            )
+            with patch('src.message_maker.chat_history.Path') as mock_path:
+                mock_path.return_value = Path(self.db_path)
+                
+                # Test 1: Full chat retrieval performance (100 messages)
+                start_time = time.time()
+                messages = get_chat_history_for_message_generation("1002", "alice123")
+                full_retrieval_time = time.time() - start_time
+                
+                self.validation_results["performance_metrics"]["full_retrieval_100_messages"] = full_retrieval_time
+                
+                performance_ok = full_retrieval_time < 1.0  # Should be under 1 second
+                self.log_test_result(
+                    "Full retrieval performance",
+                    performance_ok,
+                    f"{full_retrieval_time:.3f}s for {len(messages)} messages"
+                )
 
-            # Test 2: Recent messages retrieval performance
-            start_time = time.time()
-            recent_messages = self.chat_service.get_recent_chat_history("1002", "alice123", 20)
-            recent_retrieval_time = time.time() - start_time
-            
-            self.validation_results["performance_metrics"]["recent_retrieval_20_messages"] = recent_retrieval_time
-            
-            recent_performance_ok = recent_retrieval_time < 0.5  # Should be under 0.5 seconds
-            self.log_test_result(
-                "Recent retrieval performance",
-                recent_performance_ok,
-                f"{recent_retrieval_time:.3f}s for {len(recent_messages)} messages"
-            )
-
-            # Test 3: Multiple consecutive calls (caching behavior)
-            start_time = time.time()
-            for _ in range(10):
-                self.chat_service.get_chat_history_for_message_generation("1001", "alice123")
-            multiple_calls_time = time.time() - start_time
-            
-            self.validation_results["performance_metrics"]["10_consecutive_calls"] = multiple_calls_time
-            
-            avg_call_time = multiple_calls_time / 10
-            consistency_ok = avg_call_time < 0.1  # Average should be under 0.1 seconds
-            self.log_test_result(
-                "Consecutive calls performance",
-                consistency_ok,
-                f"Average: {avg_call_time:.3f}s per call"
-            )
+                # Test 2: Multiple consecutive calls
+                start_time = time.time()
+                for _ in range(10):
+                    get_chat_history_for_message_generation("1001", "alice123")
+                multiple_calls_time = time.time() - start_time
+                
+                self.validation_results["performance_metrics"]["10_consecutive_calls"] = multiple_calls_time
+                
+                avg_call_time = multiple_calls_time / 10
+                consistency_ok = avg_call_time < 0.1  # Average should be under 0.1 seconds
+                self.log_test_result(
+                    "Consecutive calls performance",
+                    consistency_ok,
+                    f"Average: {avg_call_time:.3f}s per call"
+                )
 
             return True
 
@@ -350,47 +326,50 @@ class ChatHistoryValidator:
         logger.info("Testing data integrity...")
         
         try:
-            # Get messages for validation
-            messages = self.chat_service.get_chat_history_for_message_generation("1001", "alice123")
-            
-            # Test 1: All messages have valid structure
-            all_valid = True
-            for i, msg in enumerate(messages):
-                try:
-                    msg.validate()
-                except Exception as e:
-                    self.log_test_result(f"Message {i} validation", False, str(e))
-                    all_valid = False
-                    break
-            
-            if all_valid:
-                self.log_test_result("Message validation", True, f"All {len(messages)} messages valid")
+            with patch('src.message_maker.chat_history.Path') as mock_path:
+                mock_path.return_value = Path(self.db_path)
+                
+                # Get messages for validation
+                messages = get_chat_history_for_message_generation("1001", "alice123")
+                
+                # Test 1: All messages have valid structure
+                all_valid = True
+                for i, msg in enumerate(messages):
+                    try:
+                        msg.validate()
+                    except Exception as e:
+                        self.log_test_result(f"Message {i} validation", False, str(e))
+                        all_valid = False
+                        break
+                
+                if all_valid:
+                    self.log_test_result("Message validation", True, f"All {len(messages)} messages valid")
 
-            # Test 2: No duplicate messages
-            contents = [msg.contents for msg in messages]
-            unique_contents = set(contents)
-            no_duplicates = len(contents) == len(unique_contents)
-            self.log_test_result("No duplicate messages", no_duplicates)
+                # Test 2: No duplicate messages
+                contents = [msg.contents for msg in messages]
+                unique_contents = set(contents)
+                no_duplicates = len(contents) == len(unique_contents)
+                self.log_test_result("No duplicate messages", no_duplicates)
 
-            # Test 3: Consistent user perspective
-            alice_perspective = self.chat_service.get_chat_history_for_message_generation("1001", "alice123")
-            bob_perspective = self.chat_service.get_chat_history_for_message_generation("1001", "bob456")
-            
-            # Should have same number of messages
-            same_count = len(alice_perspective) == len(bob_perspective)
-            
-            # is_from_me should be inverted between perspectives
-            perspective_consistent = True
-            for a_msg, b_msg in zip(alice_perspective, bob_perspective):
-                if a_msg.contents == b_msg.contents and a_msg.is_from_me == b_msg.is_from_me:
-                    perspective_consistent = False
-                    break
-            
-            self.log_test_result(
-                "User perspective consistency",
-                same_count and perspective_consistent,
-                f"Alice: {len(alice_perspective)}, Bob: {len(bob_perspective)}"
-            )
+                # Test 3: Consistent user perspective
+                alice_perspective = get_chat_history_for_message_generation("1001", "alice123")
+                bob_perspective = get_chat_history_for_message_generation("1001", "bob456")
+                
+                # Should have same number of messages
+                same_count = len(alice_perspective) == len(bob_perspective)
+                
+                # is_from_me should be inverted between perspectives
+                perspective_consistent = True
+                for a_msg, b_msg in zip(alice_perspective, bob_perspective):
+                    if a_msg.contents == b_msg.contents and a_msg.is_from_me == b_msg.is_from_me:
+                        perspective_consistent = False
+                        break
+                
+                self.log_test_result(
+                    "User perspective consistency",
+                    same_count and perspective_consistent,
+                    f"Alice: {len(alice_perspective)}, Bob: {len(bob_perspective)}"
+                )
 
             return True
 
@@ -398,37 +377,6 @@ class ChatHistoryValidator:
             self.log_test_result("Data integrity", False, str(e))
             return False
 
-    def test_recent_messages_functionality(self) -> bool:
-        """Test recent messages with various limits."""
-        logger.info("Testing recent messages functionality...")
-        
-        try:
-            # Test various limits
-            limits_to_test = [1, 5, 10, 25, 50, 100, 1000]
-            
-            for limit in limits_to_test:
-                messages = self.chat_service.get_recent_chat_history("1002", "alice123", limit)
-                expected_count = min(limit, 100)  # Chat 1002 has 100 messages
-                
-                self.log_test_result(
-                    f"Recent messages limit {limit}",
-                    len(messages) == expected_count,
-                    f"Got {len(messages)}, expected {expected_count}"
-                )
-
-            # Test that recent messages are in chronological order
-            recent_20 = self.chat_service.get_recent_chat_history("1002", "alice123", 20)
-            is_chronological = all(
-                recent_20[i].created_at <= recent_20[i+1].created_at 
-                for i in range(len(recent_20)-1)
-            )
-            self.log_test_result("Recent messages chronological order", is_chronological)
-
-            return True
-
-        except Exception as e:
-            self.log_test_result("Recent messages functionality", False, str(e))
-            return False
 
     def run_validation(self) -> Dict[str, Any]:
         """Run complete validation suite."""
@@ -445,8 +393,7 @@ class ChatHistoryValidator:
                 self.test_basic_functionality,
                 self.test_error_handling,
                 self.test_performance,
-                self.test_data_integrity,
-                self.test_recent_messages_functionality
+                self.test_data_integrity
             ]
 
             for test_suite in test_suites:
