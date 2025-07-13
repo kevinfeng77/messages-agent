@@ -66,12 +66,18 @@ When you receive a Linear ticket link or ID:
    [Definition of done]
    ```
 
-5. **Await Confirmation**
+5. **Create Feature Branch**
+   - ALWAYS create a new branch for each Linear ticket
+   - Use naming convention: `kevin/{ticket-description}`
+   - Branch from main/master before starting implementation
+   - Example: `git checkout -b kevin/refactor-directory-tree`
+
+6. **Await Confirmation**
    - Present plan for review
    - Allow for modifications and refinement
    - Proceed with implementation once approved
 
-6. **Implementation Completion**
+7. **Implementation Completion**
    - Always create comprehensive test suite
    - Run validation scripts
    - Create PR automatically using GitHub MCP
@@ -90,12 +96,30 @@ When you receive a Linear ticket link or ID:
 ```
 ai_text_agent/
 ├── src/
-│   ├── database_manager.py     # SQLite message database management
-│   ├── database_migrator.py    # Database migration utilities
-│   └── logger_config.py        # Logging configuration
-├── data/                       # Message databases and exports
-├── logs/                       # Application logs
-└── requirements.txt            # Python dependencies
+│   ├── database/
+│   │   ├── manager.py           # SQLite message database management
+│   │   ├── migrator.py          # Database migration utilities
+│   │   ├── message_migration.py # Message text decoding migration
+│   │   └── tests/               # Database-related tests
+│   ├── messaging/
+│   │   ├── decoder.py           # Message text decoding from binary
+│   │   └── tests/               # Messaging-related tests
+│   ├── graphiti/
+│   │   ├── episode_manager.py   # Graphiti knowledge graph management
+│   │   ├── example_script.py    # Graphiti usage examples
+│   │   ├── query_manager.py     # Graph query utilities
+│   │   └── tests/               # Graphiti-related tests
+│   └── utils/
+│       ├── logger_config.py     # Logging configuration
+│       └── tests/               # Utility tests
+├── scripts/                     # Standalone utility scripts
+│   ├── migrate_database.py      # Database migration runner
+│   ├── validate_implementation.py # Implementation validation
+│   └── run_full_migration.py    # Full migration automation
+├── data/                        # Message databases and exports
+├── logs/                        # Application logs
+├── tests/                       # Integration tests
+└── requirements.txt             # Python dependencies
 ```
 
 ### Key Design Principles
@@ -335,13 +359,18 @@ black --check src/ && isort --check-only src/ && flake8 src/ && mypy src/
    - Generate detailed implementation plan
    - Include testing strategy and success criteria
 
-2. **Implementation**
-   - Create feature branch: `kevin/{description}`
-   - Implement core functionality
+2. **Branch Creation (MANDATORY)**
+   - **ALWAYS create a new feature branch** for each Linear ticket
+   - Use naming convention: `kevin/{ticket-description}` (e.g., `kevin/refactor-directory-tree`)
+   - Create branch from main/master: `git checkout -b kevin/{description}`
+   - Never work directly on main or existing branches for new tickets
+
+3. **Implementation**
+   - Implement core functionality on the feature branch
    - **ALWAYS write tests concurrently** (not after)
    - Include comprehensive error handling and logging
 
-3. **Testing (REQUIRED)**
+4. **Testing (REQUIRED)**
    - Create unit tests for all new functions/classes
    - Add integration tests for database/external dependencies
    - Build performance tests for data processing features
@@ -349,13 +378,13 @@ black --check src/ && isort --check-only src/ && flake8 src/ && mypy src/
    - Ensure ≥80% code coverage
    - All tests must pass before proceeding
 
-4. **Validation & Metrics**
+5. **Validation & Metrics**
    - Run validation script and collect metrics
    - Document performance improvements
    - Verify success criteria are met
    - Test edge cases and error conditions
 
-5. **PR Creation (Use GitHub MCP)**
+6. **PR Creation (Use GitHub MCP)**
    - Commit all changes with descriptive messages
    - Push branch to origin
    - Use `mcp__github__create_pull_request` to create PR
@@ -365,7 +394,7 @@ black --check src/ && isort --check-only src/ && flake8 src/ && mypy src/
      - Testing checklist (all items checked)
      - Impact and value delivered
 
-6. **Documentation**
+7. **Documentation**
    - Update relevant documentation
    - Include architectural decisions
    - Document trade-offs and alternatives considered
