@@ -1,10 +1,10 @@
 """Logging configuration for the AI Text Agent"""
 
-import os
 import logging
 import logging.handlers
-from pathlib import Path
+import os
 from datetime import datetime
+from pathlib import Path
 
 
 def setup_logging(
