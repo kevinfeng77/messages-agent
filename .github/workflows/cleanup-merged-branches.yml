@@ -1,0 +1,86 @@
+name: Cleanup Merged Branches
+
+on:
+  pull_request:
+    types: [closed]
+  schedule:
+    # Run cleanup weekly on Sundays at 2 AM UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+    # Allow manual triggering
+
+jobs:
+  cleanup-branches:
+    name: Delete Merged Feature Branches
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Delete merged branch (PR event)
+        if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
+        run: |
+          BRANCH_NAME="${{ github.event.pull_request.head.ref }}"
+          echo "🗑️ Deleting merged branch: $BRANCH_NAME"
+          
+          # Only delete kevin/* branches to be safe
+          if [[ "$BRANCH_NAME" == kevin/* ]]; then
+            git push origin --delete "$BRANCH_NAME" || echo "Branch $BRANCH_NAME already deleted or doesn't exist"
+            echo "✅ Branch $BRANCH_NAME deleted successfully"
+          else
+            echo "⚠️ Skipping deletion of non-kevin branch: $BRANCH_NAME"
+          fi
+      
+      - name: Cleanup old merged branches (scheduled/manual)
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: |
+          echo "🧹 Starting cleanup of old merged branches..."
+          
+          # Get all remote kevin/* branches
+          git branch -r --merged origin/main | grep -E 'origin/kevin/' | grep -v 'origin/main' | while read branch; do
+            # Remove 'origin/' prefix
+            BRANCH_NAME=${branch#origin/}
+            
+            echo "🔍 Checking branch: $BRANCH_NAME"
+            
+            # Check if branch exists on remote
+            if git ls-remote --exit-code --heads origin "$BRANCH_NAME" >/dev/null 2>&1; then
+              # Get the last commit date of the branch
+              LAST_COMMIT_DATE=$(git log -1 --format="%ci" "origin/$BRANCH_NAME")
+              LAST_COMMIT_TIMESTAMP=$(date -d "$LAST_COMMIT_DATE" +%s)
+              CURRENT_TIMESTAMP=$(date +%s)
+              DAYS_OLD=$(( (CURRENT_TIMESTAMP - LAST_COMMIT_TIMESTAMP) / 86400 ))
+              
+              echo "📅 Branch $BRANCH_NAME is $DAYS_OLD days old"
+              
+              # Delete branches older than 7 days that are fully merged
+              if [ $DAYS_OLD -gt 7 ]; then
+                echo "🗑️ Deleting old merged branch: $BRANCH_NAME (${DAYS_OLD} days old)"
+                git push origin --delete "$BRANCH_NAME" || echo "Failed to delete $BRANCH_NAME"
+                echo "✅ Branch $BRANCH_NAME deleted"
+              else
+                echo "⏳ Keeping recent branch: $BRANCH_NAME"
+              fi
+            else
+              echo "ℹ️ Branch $BRANCH_NAME doesn't exist on remote"
+            fi
+          done
+          
+          echo "🎉 Cleanup completed!"
+      
+      - name: Summary
+        if: always()
+        run: |
+          echo "📊 Branch cleanup summary:"
+          echo "- Event: ${{ github.event_name }}"
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "- PR: #${{ github.event.pull_request.number }}"
+            echo "- Branch: ${{ github.event.pull_request.head.ref }}"
+            echo "- Merged: ${{ github.event.pull_request.merged }}"
+          fi
+          echo "- Timestamp: $(date)"
