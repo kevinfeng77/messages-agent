@@ -2,6 +2,11 @@
 # Note: This project only requires Python standard library
 # All dependencies below are for future AI integration
 
+# Testing dependencies
+pytest>=7.0.0          # Testing framework
+pytest-cov>=4.0.0      # Coverage reporting
+pytest-xdist>=3.0.0    # Parallel test execution
+
 # Future AI integration (optional)
 # openai>=1.0.0         # OpenAI API
 # anthropic             # Anthropic API

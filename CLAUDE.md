@@ -25,24 +25,35 @@ When you receive a Linear ticket link or ID:
 ```markdown
 ## Auto-Plan Generation Protocol
 
-1. **Fetch Ticket Details**
-   - Use `mcp__linear__get_issue` with the ticket ID (e.g., "SERENE-46")
-   - Extract: title, description, estimate, priority, project context
-   - Example: `mcp__linear__get_issue(id="SERENE-46")`
+1. **Extract Ticket ID**
+   - From URL format `https://linear.app/serene-ai/issue/SERENE-XX/...` extract "SERENE-XX"
+   - Accept direct ticket IDs like "SERENE-46" as well
 
-2. **Analyze Technical Context**
+2. **Fetch Ticket Details**
+   - Use `mcp__linear__get_issue` with the extracted ticket ID
+   - Example: `mcp__linear__get_issue(id="SERENE-46")`
+   - **CRITICAL ERROR HANDLING**: 
+     - If Linear MCP server is unavailable: STOP and inform user
+     - If ticket ID is invalid/not found: STOP and inform user
+     - If authentication fails: STOP and inform user
+     - If any other access error occurs: STOP and inform user
+   - **DO NOT PROCEED** without successful ticket access
+   - Request user to provide ticket details manually if access fails
+   - Extract: title, description, estimate, priority, project context
+
+3. **Analyze Technical Context**
    - Identify which phase/component this task belongs to
    - Review related database schemas and existing codebase
    - Consider dependencies and integration points
 
-3. **Generate Implementation Plan**
+4. **Generate Implementation Plan**
    - Break down into 3-7 concrete steps
    - Include technical approach and architecture decisions
    - Specify files to create/modify
    - Identify testing requirements
    - Note any dependencies or blockers
 
-4. **Present Plan Structure**
+5. **Present Plan Structure**
    ```
    # Implementation Plan: [Task Title]
    
@@ -67,18 +78,18 @@ When you receive a Linear ticket link or ID:
    [Definition of done]
    ```
 
-5. **Create Feature Branch**
+6. **Create Feature Branch**
    - ALWAYS create a new branch for each Linear ticket
    - Use naming convention: `kevin/{ticket-description}`
    - Branch from main/master before starting implementation
    - Example: `git checkout -b kevin/refactor-directory-tree`
 
-6. **Await Confirmation**
+7. **Await Confirmation**
    - Present plan for review
    - Allow for modifications and refinement
    - Proceed with implementation once approved
 
-7. **Implementation Completion**
+8. **Implementation Completion**
    - Always create comprehensive test suite
    - Run validation scripts
    - Create PR automatically using GitHub MCP
@@ -448,6 +459,11 @@ black --check src/ && isort --check-only src/ && flake8 src/ && mypy src/
 - **MANDATORY**: Use GitHub MCP for all GitHub operations
 - **MANDATORY**: Create validation scripts for major features
 - **MANDATORY**: Include performance metrics in PRs
+- **CRITICAL LINEAR ERROR HANDLING**: NEVER proceed if Linear ticket access fails
+  - If `mcp__linear__get_issue` fails for any reason, STOP immediately
+  - Inform user of the specific error and request manual ticket details
+  - Do not guess or assume ticket content
+  - Do not proceed with partial information
 - **Always check existing code** before implementing new functionality
 - **Use the Linear MCP server** to get full context on related tickets
 - **Consider the broader system architecture** when making implementation decisions

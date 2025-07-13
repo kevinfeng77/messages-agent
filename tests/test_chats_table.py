@@ -68,7 +68,7 @@ class TestChatsTable(unittest.TestCase):
 
     def test_insert_single_chat(self):
         """Test inserting a single chat"""
-        chat_id = "123"
+        chat_id = 123
         display_name = "Test Chat"
         user_ids = ["user1", "user2", "user3"]
 
@@ -85,7 +85,7 @@ class TestChatsTable(unittest.TestCase):
 
     def test_insert_chat_with_empty_users(self):
         """Test inserting a chat with no users"""
-        chat_id = "456"
+        chat_id = 456
         display_name = "Empty Chat"
         user_ids = []
 
@@ -127,16 +127,16 @@ class TestChatsTable(unittest.TestCase):
 
     def test_get_chat_by_id_not_found(self):
         """Test getting a chat that doesn't exist"""
-        chat = self.messages_db.get_chat_by_id("nonexistent")
+        chat = self.messages_db.get_chat_by_id(99999)
         self.assertIsNone(chat)
 
     def test_get_chats_by_display_name(self):
         """Test getting chats by display name"""
         # Insert test chats
         chats = [
-            {"chat_id": "200", "display_name": "Unique Chat", "user_ids": ["user1"]},
-            {"chat_id": "201", "display_name": "Duplicate Name", "user_ids": ["user2"]},
-            {"chat_id": "202", "display_name": "Duplicate Name", "user_ids": ["user3"]},
+            {"chat_id": 200, "display_name": "Unique Chat", "user_ids": ["user1"]},
+            {"chat_id": 201, "display_name": "Duplicate Name", "user_ids": ["user2"]},
+            {"chat_id": 202, "display_name": "Duplicate Name", "user_ids": ["user3"]},
         ]
 
         self.messages_db.insert_chats_batch(chats)
@@ -144,14 +144,14 @@ class TestChatsTable(unittest.TestCase):
         # Test unique display name
         unique_chats = self.messages_db.get_chats_by_display_name("Unique Chat")
         self.assertEqual(len(unique_chats), 1)
-        self.assertEqual(unique_chats[0]["chat_id"], "200")
+        self.assertEqual(unique_chats[0]["chat_id"], 200)
 
         # Test duplicate display name
         duplicate_chats = self.messages_db.get_chats_by_display_name("Duplicate Name")
         self.assertEqual(len(duplicate_chats), 2)
         chat_ids = [chat["chat_id"] for chat in duplicate_chats]
-        self.assertIn("201", chat_ids)
-        self.assertIn("202", chat_ids)
+        self.assertIn(201, chat_ids)
+        self.assertIn(202, chat_ids)
 
         # Test non-existent display name
         empty_chats = self.messages_db.get_chats_by_display_name("Non-existent")
@@ -202,7 +202,7 @@ class TestChatsTable(unittest.TestCase):
 
     def test_user_ids_normalized_storage(self):
         """Test that user_ids are properly stored in normalized chat_users table"""
-        chat_id = "500"
+        chat_id = 500
         display_name = "Normalized Storage Test"
         user_ids = ["user_a", "user_b", "user_c"]
 

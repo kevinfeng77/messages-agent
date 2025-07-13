@@ -187,7 +187,7 @@ class TestMessagesMigration(unittest.TestCase):
             self.assertIn("created_at", message)
             
             # Verify data types
-            self.assertIsInstance(message["message_id"], str)
+            self.assertIsInstance(message["message_id"], int)
             self.assertIsInstance(message["user_id"], str)
             self.assertIsInstance(message["contents"], str)
             self.assertIsInstance(message["is_from_me"], bool)
