@@ -390,7 +390,7 @@ class MessagesTableMigrator:
 
                     chat_data = {
                         "chat_id": int(chat_id),
-                        "display_name": display_name or f"Chat {chat_id}",
+                        "display_name": display_name,  # Keep original, will be enhanced later
                     }
 
                     chats.append(chat_data)
