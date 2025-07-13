@@ -42,13 +42,25 @@ class MessagesDatabase:
                 """
                 )
 
-                # Create chats table
+                # Create chats table (normalized - no users field)
                 cursor.execute(
                     """
                     CREATE TABLE IF NOT EXISTS chats (
+                        chat_id TEXT NOT NULL PRIMARY KEY,
+                        display_name TEXT NOT NULL
+                    )
+                """
+                )
+
+                # Create chat_users junction table for many-to-many relationship
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS chat_users (
                         chat_id TEXT NOT NULL,
-                        display_name TEXT NOT NULL,
-                        users TEXT
+                        user_id TEXT NOT NULL,
+                        FOREIGN KEY (chat_id) REFERENCES chats (chat_id) ON DELETE CASCADE,
+                        FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE,
+                        PRIMARY KEY (chat_id, user_id)
                     )
                 """
                 )
@@ -70,10 +82,13 @@ class MessagesDatabase:
                     "CREATE INDEX IF NOT EXISTS idx_users_handle_id ON users(handle_id)"
                 )
                 cursor.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_chats_chat_id ON chats(chat_id)"
+                    "CREATE INDEX IF NOT EXISTS idx_chats_display_name ON chats(display_name)"
                 )
                 cursor.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_chats_display_name ON chats(display_name)"
+                    "CREATE INDEX IF NOT EXISTS idx_chat_users_chat_id ON chat_users(chat_id)"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_chat_users_user_id ON chat_users(user_id)"
                 )
 
                 conn.commit()
@@ -466,14 +481,16 @@ class MessagesDatabase:
             logger.error(f"Error getting table schema for {table_name}: {e}")
             return None
 
-    def insert_chat(self, chat_id: str, display_name: str, user_ids: List[str]) -> bool:
+    def insert_chat(
+        self, chat_id: str, display_name: str, user_ids: List[str] = None
+    ) -> bool:
         """
-        Insert a chat into the chats table
+        Insert a chat into the chats table and optionally add users
 
         Args:
             chat_id: Unique identifier for the chat
             display_name: Display name of the chat
-            user_ids: List of user IDs in the chat
+            user_ids: Optional list of user IDs to add to the chat
 
         Returns:
             True if successful, False otherwise
@@ -482,16 +499,25 @@ class MessagesDatabase:
             with sqlite3.connect(str(self.db_path)) as conn:
                 cursor = conn.cursor()
 
-                # Convert user_ids list to pipe-separated string
-                users_str = "|".join(user_ids) if user_ids else ""
-
+                # Insert chat
                 cursor.execute(
                     """
-                    INSERT INTO chats (chat_id, display_name, users)
-                    VALUES (?, ?, ?)
+                    INSERT INTO chats (chat_id, display_name)
+                    VALUES (?, ?)
                 """,
-                    (chat_id, display_name, users_str),
+                    (chat_id, display_name),
                 )
+
+                # Add users to the chat if provided
+                if user_ids:
+                    chat_user_data = [(chat_id, user_id) for user_id in user_ids]
+                    cursor.executemany(
+                        """
+                        INSERT INTO chat_users (chat_id, user_id)
+                        VALUES (?, ?)
+                    """,
+                        chat_user_data,
+                    )
 
                 conn.commit()
                 return True
@@ -517,28 +543,41 @@ class MessagesDatabase:
             with sqlite3.connect(str(self.db_path)) as conn:
                 cursor = conn.cursor()
 
-                # Prepare data for batch insert
-                chat_data = []
-                for chat in chats:
-                    users_str = (
-                        "|".join(chat.get("user_ids", []))
-                        if chat.get("user_ids")
-                        else ""
-                    )
-                    chat_data.append((chat["chat_id"], chat["display_name"], users_str))
+                # Prepare chat data for batch insert
+                chat_data = [(chat["chat_id"], chat["display_name"]) for chat in chats]
 
                 cursor.executemany(
                     """
-                    INSERT INTO chats (chat_id, display_name, users)
-                    VALUES (?, ?, ?)
+                    INSERT INTO chats (chat_id, display_name)
+                    VALUES (?, ?)
                 """,
                     chat_data,
                 )
 
-                inserted_count = cursor.rowcount
+                # Prepare chat_users data for batch insert
+                chat_user_data = []
+                for chat in chats:
+                    chat_id = chat["chat_id"]
+                    user_ids = chat.get("user_ids", [])
+                    if user_ids:
+                        for user_id in user_ids:
+                            chat_user_data.append((chat_id, user_id))
+
+                if chat_user_data:
+                    cursor.executemany(
+                        """
+                        INSERT INTO chat_users (chat_id, user_id)
+                        VALUES (?, ?)
+                    """,
+                        chat_user_data,
+                    )
+
+                inserted_count = len(chat_data)
                 conn.commit()
 
-                logger.info(f"Inserted {inserted_count} chats into messages database")
+                logger.info(
+                    f"Inserted {inserted_count} chats and {len(chat_user_data)} chat-user relationships into messages database"
+                )
                 return inserted_count
 
         except sqlite3.Error as e:
@@ -547,37 +586,50 @@ class MessagesDatabase:
 
     def get_chat_by_id(self, chat_id: str) -> Optional[Dict[str, Any]]:
         """
-        Get a chat by its ID
+        Get a chat by its ID with associated users
 
         Args:
             chat_id: Chat ID to search for
 
         Returns:
-            Chat dictionary if found, None otherwise
+            Chat dictionary with user_ids list if found, None otherwise
         """
         try:
             with sqlite3.connect(str(self.db_path)) as conn:
                 cursor = conn.cursor()
 
+                # Get chat details
                 cursor.execute(
                     """
-                    SELECT chat_id, display_name, users
+                    SELECT chat_id, display_name
                     FROM chats WHERE chat_id = ?
                 """,
                     (chat_id,),
                 )
 
-                row = cursor.fetchone()
-                if row:
-                    chat_id, display_name, users_str = row
-                    user_ids = users_str.split("|") if users_str else []
-                    return {
-                        "chat_id": chat_id,
-                        "display_name": display_name,
-                        "user_ids": user_ids,
-                    }
+                chat_row = cursor.fetchone()
+                if not chat_row:
+                    return None
 
-                return None
+                chat_id, display_name = chat_row
+
+                # Get associated user IDs
+                cursor.execute(
+                    """
+                    SELECT user_id
+                    FROM chat_users WHERE chat_id = ?
+                    ORDER BY user_id
+                """,
+                    (chat_id,),
+                )
+
+                user_ids = [row[0] for row in cursor.fetchall()]
+
+                return {
+                    "chat_id": chat_id,
+                    "display_name": display_name,
+                    "user_ids": user_ids,
+                }
 
         except sqlite3.Error as e:
             logger.error(f"Error getting chat {chat_id}: {e}")
@@ -585,30 +637,46 @@ class MessagesDatabase:
 
     def get_chats_by_display_name(self, display_name: str) -> List[Dict[str, Any]]:
         """
-        Get chats by display name
+        Get chats by display name with associated users
 
         Args:
             display_name: Display name to search for
 
         Returns:
-            List of chat dictionaries
+            List of chat dictionaries with user_ids
         """
         try:
             with sqlite3.connect(str(self.db_path)) as conn:
                 cursor = conn.cursor()
 
+                # Get chats with the display name
                 cursor.execute(
                     """
-                    SELECT chat_id, display_name, users
+                    SELECT chat_id, display_name
                     FROM chats WHERE display_name = ?
+                    ORDER BY chat_id
                 """,
                     (display_name,),
                 )
 
+                chat_rows = cursor.fetchall()
+                if not chat_rows:
+                    return []
+
                 chats = []
-                for row in cursor.fetchall():
-                    chat_id, display_name, users_str = row
-                    user_ids = users_str.split("|") if users_str else []
+                for chat_id, display_name in chat_rows:
+                    # Get users for this chat
+                    cursor.execute(
+                        """
+                        SELECT user_id
+                        FROM chat_users WHERE chat_id = ?
+                        ORDER BY user_id
+                    """,
+                        (chat_id,),
+                    )
+
+                    user_ids = [row[0] for row in cursor.fetchall()]
+
                     chats.append(
                         {
                             "chat_id": chat_id,
@@ -625,28 +693,40 @@ class MessagesDatabase:
 
     def get_all_chats(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """
-        Get all chats from the database
+        Get all chats from the database with their associated users
 
         Args:
             limit: Optional limit on number of chats to return
 
         Returns:
-            List of chat dictionaries
+            List of chat dictionaries with user_ids
         """
         try:
             with sqlite3.connect(str(self.db_path)) as conn:
                 cursor = conn.cursor()
 
-                query = "SELECT chat_id, display_name, users FROM chats"
+                # Get all chats
+                query = "SELECT chat_id, display_name FROM chats ORDER BY chat_id"
                 if limit:
                     query += f" LIMIT {limit}"
 
                 cursor.execute(query)
+                chat_rows = cursor.fetchall()
 
                 chats = []
-                for row in cursor.fetchall():
-                    chat_id, display_name, users_str = row
-                    user_ids = users_str.split("|") if users_str else []
+                for chat_id, display_name in chat_rows:
+                    # Get users for this chat
+                    cursor.execute(
+                        """
+                        SELECT user_id
+                        FROM chat_users WHERE chat_id = ?
+                        ORDER BY user_id
+                    """,
+                        (chat_id,),
+                    )
+
+                    user_ids = [row[0] for row in cursor.fetchall()]
+
                     chats.append(
                         {
                             "chat_id": chat_id,
@@ -663,7 +743,7 @@ class MessagesDatabase:
 
     def clear_chats_table(self) -> bool:
         """
-        Clear all chats from the chats table
+        Clear all chats and chat-user relationships
 
         Returns:
             True if successful, False otherwise
@@ -671,12 +751,174 @@ class MessagesDatabase:
         try:
             with sqlite3.connect(str(self.db_path)) as conn:
                 cursor = conn.cursor()
+
+                # Clear chat_users first due to foreign key constraint
+                cursor.execute("DELETE FROM chat_users")
                 cursor.execute("DELETE FROM chats")
+
                 conn.commit()
 
-                logger.info("Cleared all chats from chats table")
+                logger.info("Cleared all chats and chat-user relationships")
                 return True
 
         except sqlite3.Error as e:
-            logger.error(f"Error clearing chats table: {e}")
+            logger.error(f"Error clearing chats tables: {e}")
             return False
+
+    def add_user_to_chat(self, chat_id: str, user_id: str) -> bool:
+        """
+        Add a user to an existing chat
+
+        Args:
+            chat_id: Chat ID to add user to
+            user_id: User ID to add
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO chat_users (chat_id, user_id)
+                    VALUES (?, ?)
+                """,
+                    (chat_id, user_id),
+                )
+
+                conn.commit()
+                return True
+
+        except sqlite3.Error as e:
+            logger.error(f"Error adding user {user_id} to chat {chat_id}: {e}")
+            return False
+
+    def remove_user_from_chat(self, chat_id: str, user_id: str) -> bool:
+        """
+        Remove a user from a chat
+
+        Args:
+            chat_id: Chat ID to remove user from
+            user_id: User ID to remove
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+
+                cursor.execute(
+                    """
+                    DELETE FROM chat_users 
+                    WHERE chat_id = ? AND user_id = ?
+                """,
+                    (chat_id, user_id),
+                )
+
+                conn.commit()
+                return True
+
+        except sqlite3.Error as e:
+            logger.error(f"Error removing user {user_id} from chat {chat_id}: {e}")
+            return False
+
+    def get_chats_for_user(self, user_id: str) -> List[Dict[str, Any]]:
+        """
+        Get all chats that a user participates in
+
+        Args:
+            user_id: User ID to get chats for
+
+        Returns:
+            List of chat dictionaries
+        """
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+
+                cursor.execute(
+                    """
+                    SELECT c.chat_id, c.display_name
+                    FROM chats c
+                    JOIN chat_users cu ON c.chat_id = cu.chat_id
+                    WHERE cu.user_id = ?
+                    ORDER BY c.chat_id
+                """,
+                    (user_id,),
+                )
+
+                chats = []
+                for chat_id, display_name in cursor.fetchall():
+                    # Get all users for this chat
+                    cursor.execute(
+                        """
+                        SELECT user_id
+                        FROM chat_users WHERE chat_id = ?
+                        ORDER BY user_id
+                    """,
+                        (chat_id,),
+                    )
+
+                    user_ids = [row[0] for row in cursor.fetchall()]
+
+                    chats.append(
+                        {
+                            "chat_id": chat_id,
+                            "display_name": display_name,
+                            "user_ids": user_ids,
+                        }
+                    )
+
+                return chats
+
+        except sqlite3.Error as e:
+            logger.error(f"Error getting chats for user {user_id}: {e}")
+            return []
+
+    def get_chat_users_with_details(self, chat_id: str) -> List[Dict[str, Any]]:
+        """
+        Get full user details for all users in a chat
+
+        Args:
+            chat_id: Chat ID to get users for
+
+        Returns:
+            List of user detail dictionaries
+        """
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+
+                cursor.execute(
+                    """
+                    SELECT u.user_id, u.first_name, u.last_name, u.phone_number, u.email, u.handle_id
+                    FROM users u
+                    JOIN chat_users cu ON u.user_id = cu.user_id
+                    WHERE cu.chat_id = ?
+                    ORDER BY u.first_name, u.last_name
+                """,
+                    (chat_id,),
+                )
+
+                users = []
+                for row in cursor.fetchall():
+                    user_id, first_name, last_name, phone_number, email, handle_id = row
+                    users.append(
+                        {
+                            "user_id": user_id,
+                            "first_name": first_name,
+                            "last_name": last_name,
+                            "phone_number": phone_number,
+                            "email": email,
+                            "handle_id": handle_id,
+                        }
+                    )
+
+                return users
+
+        except sqlite3.Error as e:
+            logger.error(f"Error getting user details for chat {chat_id}: {e}")
+            return []

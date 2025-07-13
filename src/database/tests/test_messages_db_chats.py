@@ -42,30 +42,67 @@ class TestMessagesDatabaseChats(unittest.TestCase):
         schema = self.messages_db.get_table_schema("chats")
         self.assertIsNotNone(schema)
 
-        # Check for required columns
+        # Check for required columns (users field removed in normalized design)
         columns = [col[1] for col in schema]
         self.assertIn("chat_id", columns)
         self.assertIn("display_name", columns)
-        self.assertIn("users", columns)
+        self.assertNotIn("users", columns)  # Should not have users field anymore
+
+    def test_database_creation_includes_chat_users_table(self):
+        """Test that create_database() creates chat_users junction table"""
+        # Check that chat_users table exists
+        self.assertTrue(self.messages_db.table_exists("chat_users"))
+
+        # Check schema
+        schema = self.messages_db.get_table_schema("chat_users")
+        self.assertIsNotNone(schema)
+
+        # Check for required columns
+        columns = [col[1] for col in schema]
+        self.assertIn("chat_id", columns)
+        self.assertIn("user_id", columns)
 
     def test_chats_table_indexes(self):
-        """Test that proper indexes are created for chats table"""
+        """Test that proper indexes are created for chats and chat_users tables"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
 
-            # Check for indexes
+            # Check for chats table indexes
             cursor.execute(
                 """
                 SELECT name FROM sqlite_master 
                 WHERE type='index' AND tbl_name='chats'
             """
             )
-            indexes = [row[0] for row in cursor.fetchall()]
+            chats_indexes = [row[0] for row in cursor.fetchall()]
 
-            # Should have indexes on chat_id and display_name
-            index_names = ["idx_chats_chat_id", "idx_chats_display_name"]
-            for index_name in index_names:
-                self.assertIn(index_name, indexes, f"Missing index: {index_name}")
+            # Should have index on display_name (chat_id is primary key so doesn't need explicit index)
+            expected_chats_indexes = ["idx_chats_display_name"]
+            for index_name in expected_chats_indexes:
+                self.assertIn(
+                    index_name, chats_indexes, f"Missing chats index: {index_name}"
+                )
+
+            # Check for chat_users table indexes
+            cursor.execute(
+                """
+                SELECT name FROM sqlite_master 
+                WHERE type='index' AND tbl_name='chat_users'
+            """
+            )
+            chat_users_indexes = [row[0] for row in cursor.fetchall()]
+
+            # Should have indexes on both chat_id and user_id
+            expected_chat_users_indexes = [
+                "idx_chat_users_chat_id",
+                "idx_chat_users_user_id",
+            ]
+            for index_name in expected_chat_users_indexes:
+                self.assertIn(
+                    index_name,
+                    chat_users_indexes,
+                    f"Missing chat_users index: {index_name}",
+                )
 
     def test_insert_chat_basic(self):
         """Test basic chat insertion"""
@@ -94,7 +131,7 @@ class TestMessagesDatabaseChats(unittest.TestCase):
 
         chat = self.messages_db.get_chat_by_id(chat_id)
         self.assertEqual(chat["display_name"], display_name)
-        self.assertEqual(chat["user_ids"], user_ids)
+        self.assertEqual(sorted(chat["user_ids"]), sorted(user_ids))
 
     def test_insert_chat_empty_user_list(self):
         """Test inserting chat with empty user list"""
@@ -243,29 +280,32 @@ class TestMessagesDatabaseChats(unittest.TestCase):
         # Verify table is empty
         self.assertEqual(len(self.messages_db.get_all_chats()), 0)
 
-    def test_user_ids_comma_separation(self):
-        """Test that user IDs are properly stored as comma-separated values"""
-        chat_id = "comma_test"
-        display_name = "Comma Test"
+    def test_user_ids_normalized_storage(self):
+        """Test that user IDs are properly stored in normalized chat_users table"""
+        chat_id = "normalized_test"
+        display_name = "Normalized Test"
         user_ids = ["user,with,commas", "normal_user", "user@email.com"]
 
         # Insert chat
         result = self.messages_db.insert_chat(chat_id, display_name, user_ids)
         self.assertTrue(result)
 
-        # Check raw storage in database
+        # Check raw storage in chat_users table
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT users FROM chats WHERE chat_id = ?", (chat_id,))
-            raw_users = cursor.fetchone()[0]
+            cursor.execute(
+                "SELECT user_id FROM chat_users WHERE chat_id = ? ORDER BY user_id",
+                (chat_id,),
+            )
+            stored_user_ids = [row[0] for row in cursor.fetchall()]
 
-            # Should be pipe-separated
-            expected = "user,with,commas|normal_user|user@email.com"
-            self.assertEqual(raw_users, expected)
+            # Should have all user IDs stored correctly
+            expected_sorted = sorted(user_ids)
+            self.assertEqual(stored_user_ids, expected_sorted)
 
         # Check retrieval still works correctly
         chat = self.messages_db.get_chat_by_id(chat_id)
-        self.assertEqual(chat["user_ids"], user_ids)
+        self.assertEqual(sorted(chat["user_ids"]), sorted(user_ids))
 
     def test_large_user_list(self):
         """Test handling of large user lists"""
@@ -278,7 +318,7 @@ class TestMessagesDatabaseChats(unittest.TestCase):
 
         chat = self.messages_db.get_chat_by_id(chat_id)
         self.assertEqual(len(chat["user_ids"]), 100)
-        self.assertEqual(chat["user_ids"], user_ids)
+        self.assertEqual(sorted(chat["user_ids"]), sorted(user_ids))
 
     def test_unicode_handling(self):
         """Test handling of Unicode characters in chat data"""
@@ -291,7 +331,7 @@ class TestMessagesDatabaseChats(unittest.TestCase):
 
         chat = self.messages_db.get_chat_by_id(chat_id)
         self.assertEqual(chat["display_name"], display_name)
-        self.assertEqual(chat["user_ids"], user_ids)
+        self.assertEqual(sorted(chat["user_ids"]), sorted(user_ids))
 
     def test_concurrent_access(self):
         """Test basic concurrent access patterns"""
@@ -327,6 +367,134 @@ class TestMessagesDatabaseChats(unittest.TestCase):
         # Verify all chats are in database
         all_chats = self.messages_db.get_all_chats()
         self.assertEqual(len(all_chats), 5)
+
+    def test_add_user_to_chat(self):
+        """Test adding a user to an existing chat"""
+        chat_id = "add_user_test"
+        display_name = "Add User Test"
+        initial_users = ["user1", "user2"]
+
+        # Create chat with initial users
+        result = self.messages_db.insert_chat(chat_id, display_name, initial_users)
+        self.assertTrue(result)
+
+        # Add a new user
+        result = self.messages_db.add_user_to_chat(chat_id, "user3")
+        self.assertTrue(result)
+
+        # Verify user was added
+        chat = self.messages_db.get_chat_by_id(chat_id)
+        self.assertIn("user3", chat["user_ids"])
+        self.assertEqual(len(chat["user_ids"]), 3)
+
+        # Test adding duplicate user (should not fail due to INSERT OR IGNORE)
+        result = self.messages_db.add_user_to_chat(chat_id, "user1")
+        self.assertTrue(result)
+
+        # Should still have only 3 users
+        chat = self.messages_db.get_chat_by_id(chat_id)
+        self.assertEqual(len(chat["user_ids"]), 3)
+
+    def test_remove_user_from_chat(self):
+        """Test removing a user from a chat"""
+        chat_id = "remove_user_test"
+        display_name = "Remove User Test"
+        initial_users = ["user1", "user2", "user3"]
+
+        # Create chat with users
+        result = self.messages_db.insert_chat(chat_id, display_name, initial_users)
+        self.assertTrue(result)
+
+        # Remove a user
+        result = self.messages_db.remove_user_from_chat(chat_id, "user2")
+        self.assertTrue(result)
+
+        # Verify user was removed
+        chat = self.messages_db.get_chat_by_id(chat_id)
+        self.assertNotIn("user2", chat["user_ids"])
+        self.assertEqual(len(chat["user_ids"]), 2)
+
+        # Test removing non-existent user (should not fail)
+        result = self.messages_db.remove_user_from_chat(chat_id, "nonexistent")
+        self.assertTrue(result)
+
+    def test_get_chats_for_user(self):
+        """Test getting all chats for a specific user"""
+        # Create multiple chats with different user combinations
+        chats_data = [
+            {
+                "chat_id": "chat1",
+                "display_name": "Chat 1",
+                "user_ids": ["user1", "user2"],
+            },
+            {
+                "chat_id": "chat2",
+                "display_name": "Chat 2",
+                "user_ids": ["user1", "user3"],
+            },
+            {
+                "chat_id": "chat3",
+                "display_name": "Chat 3",
+                "user_ids": ["user2", "user3"],
+            },
+            {"chat_id": "chat4", "display_name": "Chat 4", "user_ids": ["user4"]},
+        ]
+
+        self.messages_db.insert_chats_batch(chats_data)
+
+        # Get chats for user1
+        user1_chats = self.messages_db.get_chats_for_user("user1")
+        self.assertEqual(len(user1_chats), 2)
+        chat_ids = [chat["chat_id"] for chat in user1_chats]
+        self.assertIn("chat1", chat_ids)
+        self.assertIn("chat2", chat_ids)
+
+        # Get chats for user4
+        user4_chats = self.messages_db.get_chats_for_user("user4")
+        self.assertEqual(len(user4_chats), 1)
+        self.assertEqual(user4_chats[0]["chat_id"], "chat4")
+
+        # Get chats for non-existent user
+        empty_chats = self.messages_db.get_chats_for_user("nonexistent")
+        self.assertEqual(len(empty_chats), 0)
+
+    def test_get_chat_users_with_details(self):
+        """Test getting full user details for chat participants"""
+        # First create some users in the users table
+        from src.user.user import User
+
+        test_users = [
+            User("user1", "John", "Doe", "+1234567890", "john@example.com", None),
+            User("user2", "Jane", "Smith", "+9876543210", "jane@example.com", None),
+        ]
+
+        for user in test_users:
+            self.messages_db.insert_user(user)
+
+        # Create a chat with these users
+        chat_id = "details_test"
+        display_name = "Details Test"
+        user_ids = ["user1", "user2"]
+
+        result = self.messages_db.insert_chat(chat_id, display_name, user_ids)
+        self.assertTrue(result)
+
+        # Get user details for the chat
+        user_details = self.messages_db.get_chat_users_with_details(chat_id)
+        self.assertEqual(len(user_details), 2)
+
+        # Verify details are correct
+        user_names = [
+            f"{user['first_name']} {user['last_name']}" for user in user_details
+        ]
+        self.assertIn("John Doe", user_names)
+        self.assertIn("Jane Smith", user_names)
+
+        # Test with chat that has no users
+        empty_chat_id = "empty_details_test"
+        self.messages_db.insert_chat(empty_chat_id, "Empty Details Test", [])
+        empty_details = self.messages_db.get_chat_users_with_details(empty_chat_id)
+        self.assertEqual(len(empty_details), 0)
 
 
 if __name__ == "__main__":
