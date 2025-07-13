@@ -1,17 +1,17 @@
 """Database Manager - Safe copying and WAL handling for Messages database"""
 
+import logging
 import os
 import shutil
 import sqlite3
-import logging
-from pathlib import Path
-from typing import Optional, Tuple, List, Dict, Any
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 try:
-    from .message_decoder import extract_message_text, MessageDecoder
+    from .message_decoder import MessageDecoder, extract_message_text
 except ImportError:
-    from message_decoder import extract_message_text, MessageDecoder
+    from message_decoder import MessageDecoder, extract_message_text
 
 logger = logging.getLogger(__name__)
 
