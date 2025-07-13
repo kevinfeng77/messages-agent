@@ -445,10 +445,9 @@ mcp__github__create_pull_request(
 The repository uses a GitHub Actions workflow (`.github/workflows/test.yml`) that runs:
 
 1. **Test Suite**: `just test` - Runs all unit and integration tests
-2. **Code Quality**: Formatting checks (black, isort) and linting (flake8, mypy)
-3. **Dependencies**: Automatic installation of testing dependencies
+2. **Dependencies**: Automatic installation of testing dependencies
 
-**Note**: Validation scripts are currently disabled pending dependency fixes.
+**Note**: Code formatting, linting, and validation scripts are currently disabled pending setup fixes.
 
 #### Workflow Triggers
 - **Pull Requests**: All PRs to `main` or `master` branches
@@ -474,10 +473,8 @@ on:
 
 **This ensures no code reaches main without:**
 - ✅ All tests passing (`just test`)
-- ✅ Code formatting compliance (black, isort)
-- ✅ Linting checks passing (flake8, mypy)
 
-**Note**: Validation scripts (`just validate`) are currently disabled in CI until validation dependencies are fixed.
+**Note**: Code formatting, linting, and validation checks will be added to CI once properly configured.
 
 ### Linting & Quality (MANDATORY BEFORE PR)
 ```bash

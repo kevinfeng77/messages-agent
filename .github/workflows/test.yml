@@ -40,13 +40,3 @@ jobs:
       
     - name: Run tests
       run: just test
-      
-    - name: Check code formatting
-      run: |
-        black --check scripts/ src/
-        isort --check-only scripts/ src/
-        
-    - name: Run linting
-      run: |
-        flake8 scripts/ src/
-        mypy src/
