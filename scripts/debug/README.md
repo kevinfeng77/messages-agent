@@ -15,6 +15,12 @@ Debugs binary message decoding issues:
 - Analyzes message text encoding problems
 - Helps with character encoding and binary data issues
 
+### `analyze_nsdictionary.py`
+Analyzes NSDictionary parsing failures in MessageDecoder:
+- Examines binary structure of NSAttributedString data
+- Helps debug messages that return "NSDictionary" instead of text
+- Provides hex dumps and pattern analysis for troubleshooting
+
 ## Usage
 
 Run debug scripts from the project root:
@@ -25,10 +31,14 @@ python scripts/debug/debug_addressbook_data.py
 
 # Debug binary encoding issues  
 python scripts/debug/debug_binary.py
+
+# Analyze NSDictionary parsing issues
+python scripts/debug/analyze_nsdictionary.py
 ```
 
 ## When to Use
 
 - **Contact Extraction Issues**: Use `debug_addressbook_data.py` when users aren't being extracted properly from the address book
 - **Message Encoding Problems**: Use `debug_binary.py` when seeing garbled text or encoding errors in messages
+- **NSDictionary Parsing Issues**: Use `analyze_nsdictionary.py` when messages decode as "NSDictionary" instead of actual text
 - **Database Access Issues**: Use these scripts to verify database accessibility and data integrity

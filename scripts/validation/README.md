@@ -25,6 +25,13 @@ Validates messages table migration and content:
 - Tests message-chat relationships
 - Validates data integrity and completeness
 
+### `test_decoder_fix.py`
+Validates NSDictionary parsing fix in MessageDecoder:
+- Tests that specific message IDs decode correctly (e.g., ROWID 224717)
+- Validates previously failing NSDictionary cases
+- Provides comprehensive performance metrics
+- Ensures no regression in existing functionality
+
 ## Usage
 
 Run validation scripts from the project root:
@@ -37,6 +44,7 @@ just validate
 python scripts/validation/validate_chat_migration.py
 python scripts/validation/validate_messages_database.py
 python scripts/validation/validate_messages_table.py
+python scripts/validation/test_decoder_fix.py
 ```
 
 ## Built-in Validation

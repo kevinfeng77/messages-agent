@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 
 # Add src to path for imports
-sys.path.append('../../../src')
+sys.path.append('../src')
 from messaging.decoder import MessageDecoder
 
 
@@ -16,7 +16,7 @@ class TestNSDictionaryDecoder(unittest.TestCase):
     def setUp(self):
         """Set up test environment"""
         self.decoder = MessageDecoder()
-        self.db_path = Path('./data/copy/chat_copy.db')
+        self.db_path = Path('../data/copy/chat_copy.db')
 
     def test_target_message_224717(self):
         """Test that ROWID 224717 decodes to expected text"""
@@ -44,13 +44,13 @@ class TestNSDictionaryDecoder(unittest.TestCase):
             self.skipTest("Original database not available")
 
         test_cases = [
-            (224717, "Me always the luckiest ever"),
-            (129543, "Me is luckiest ever :Do"),
-            (24119, "Me always now fr"),
+            (224717, 'Me always the luckiest ever'),
+            (129543, 'Me is luckiest ever :Do'),
+            (24119, 'Me always now fr'),
             (35669, "U can't always be market making's"),
-            (56232, "I always get it"),
-            (69918, "Me always loves bubs"),
-            (73711, "I always love you!")
+            (56232, 'I always get it'),
+            (69918, 'Me always loves bubs'),
+            (73711, 'I always love you!')
         ]
 
         conn = sqlite3.connect(str(self.db_path))
