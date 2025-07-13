@@ -127,7 +127,7 @@ class DatabaseMigrator:
 
         with sqlite3.connect(self.source_db_path) as source_conn:
             with sqlite3.connect(self.target_db_path) as target_conn:
-                source_cursor = source_conn.cursor()
+                target_cursor = target_conn.cursor()
                 # Build the query with optional limit
                 query = """
                     SELECT
@@ -160,6 +160,7 @@ class DatabaseMigrator:
                 logger.info(
                     f"Executing migration query{'with limit ' + str(limit) if limit else ''}..."
                 )
+                source_cursor = source_conn.cursor()
                 source_cursor.execute(query)
 
                 # Prepare insert statement
