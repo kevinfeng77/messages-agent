@@ -70,6 +70,12 @@ When you receive a Linear ticket link or ID:
    - Present plan for review
    - Allow for modifications and refinement
    - Proceed with implementation once approved
+
+6. **Implementation Completion**
+   - Always create comprehensive test suite
+   - Run validation scripts
+   - Create PR automatically using GitHub MCP
+   - Include performance metrics and validation results
 ```
 
 ## Project Context & Architecture
@@ -119,11 +125,32 @@ ai_text_agent/
 - Implement proper error handling for graph operations
 - Include monitoring for graph query performance
 
-### For Testing
-- Unit tests for business logic
-- Integration tests for database operations
-- End-to-end tests for critical user flows
-- Performance tests for high-throughput scenarios
+### For Testing (MANDATORY)
+**ALWAYS Required for Every Implementation:**
+- **Unit Tests**: Test all new functions, classes, and methods
+- **Integration Tests**: Test database operations and external dependencies
+- **Performance Tests**: Test with realistic data volumes (especially for data processing)
+- **Validation Scripts**: Create end-to-end validation for major features
+- **Error Handling Tests**: Test edge cases and failure scenarios
+- **Regression Tests**: Ensure existing functionality still works
+
+**Testing Requirements:**
+- Minimum 80% code coverage for new code
+- All tests must pass before PR creation
+- Include both positive and negative test cases
+- Test with real data samples when available
+- Document test approach in implementation plan
+
+**Test File Structure:**
+```
+tests/
+├── unit/
+│   └── test_[module_name].py
+├── integration/
+│   └── test_[feature_name]_integration.py
+└── validation/
+    └── validate_[feature_name].py
+```
 
 ## Git Workflow & Branch Management
 
@@ -156,35 +183,57 @@ All branches should follow the pattern: `kevin/{description-of-changes-in-few-wo
    - Include tests and documentation
    - Run linting and quality checks
 
-3. **Create Pull Request**
+3. **Create Pull Request (Use GitHub MCP)**
+   - **ALWAYS use GitHub MCP tools** instead of external CLI tools
+   - Use `mcp__github__create_pull_request` with proper parameters
+   - Include comprehensive PR description with metrics and validation
+   - Link to Linear ticket in description
    - Use proper title format with Linear ticket number
-   - Include implementation summary in PR description
-   - Link to the Linear ticket
-   - Request code review
 
-4. **PR Template**
+4. **Enhanced PR Template**
    ```markdown
    ## Summary
-   [Brief description of changes]
+   [Brief description of changes and impact]
 
    ## Linear Ticket
    Closes [Linear ticket URL]
 
+   ## Problem Solved
+   [Specific problem this addresses with context]
+
    ## Implementation Details
    - [Key implementation points]
    - [Architecture decisions made]
-   - [Testing approach]
+   - [Performance considerations]
 
-   ## Testing
-   - [ ] Unit tests added/updated
-   - [ ] Integration tests passing
-   - [ ] Manual testing completed
+   ## Results Achieved
+   ### Performance Metrics
+   - [Quantifiable improvements, if applicable]
+   - [Processing speed, accuracy, coverage, etc.]
+   
+   ### Validation Results
+   - [Validation script results]
+   - [Success criteria met]
 
-   ## Checklist
+   ## Testing (MANDATORY)
+   - [ ] **Unit tests**: Created for all new functions/classes
+   - [ ] **Integration tests**: Database and external dependencies tested
+   - [ ] **Performance tests**: Tested with realistic data volumes
+   - [ ] **Validation script**: End-to-end validation implemented
+   - [ ] **Error handling**: Edge cases and failures tested
+   - [ ] **Test coverage**: ≥80% coverage achieved
+   - [ ] **All tests passing**: Full test suite executed successfully
+
+   ## Architecture & Security
    - [ ] Code follows project conventions
    - [ ] Documentation updated
    - [ ] No breaking changes (or properly documented)
-   - [ ] Logging and error handling included
+   - [ ] Comprehensive logging and error handling
+   - [ ] Security considerations addressed
+   - [ ] Performance impact assessed
+
+   ## Impact
+   [Overall impact and value delivered]
    ```
 
 ## Commands & Scripts
@@ -213,7 +262,7 @@ git checkout -b kevin/{description}
 git add .
 git commit -m "Implement [feature description]"
 
-# Push branch and create PR
+# Push branch (PR creation handled by MCP)
 git push -u origin kevin/{description}
 
 # After PR approval, clean up
@@ -221,6 +270,33 @@ git checkout main
 git pull origin main
 git branch -d kevin/{description}
 ```
+
+### GitHub MCP Workflow (PREFERRED METHOD)
+**ALWAYS use GitHub MCP tools instead of external CLI tools:**
+
+```python
+# Create Pull Request
+mcp__github__create_pull_request(
+    owner="kevinfeng77",
+    repo="messages-agent", 
+    title="[LINEAR-TICKET] Description",
+    head="kevin/{branch-name}",
+    base="main",
+    body="[Comprehensive PR description with metrics]"
+)
+
+# Other useful GitHub MCP tools:
+# - mcp__github__get_file_contents: Read files from repo
+# - mcp__github__push_files: Push multiple files at once
+# - mcp__github__create_branch: Create branches
+# - mcp__github__merge_pull_request: Merge PRs
+```
+
+**Benefits of Using GitHub MCP:**
+- No external dependencies or CLI installation required
+- Integrated authentication and error handling
+- Consistent API interface across all operations
+- Better error messages and debugging capabilities
 
 ### Linting & Quality
 ```bash
@@ -242,14 +318,82 @@ flake8 src/
 - **Phase 3 Tasks**: User profiling, contextual search, response generation
 - **Phase 4 Tasks**: Message interception, live responses, monitoring
 
+## Complete Implementation Workflow
+
+### MANDATORY Implementation Steps (Always Follow):
+
+1. **Plan Generation**
+   - Fetch Linear ticket details using MCP
+   - Generate detailed implementation plan
+   - Include testing strategy and success criteria
+
+2. **Implementation**
+   - Create feature branch: `kevin/{description}`
+   - Implement core functionality
+   - **ALWAYS write tests concurrently** (not after)
+   - Include comprehensive error handling and logging
+
+3. **Testing (REQUIRED)**
+   - Create unit tests for all new functions/classes
+   - Add integration tests for database/external dependencies
+   - Build performance tests for data processing features
+   - Create validation script for end-to-end testing
+   - Ensure ≥80% code coverage
+   - All tests must pass before proceeding
+
+4. **Validation & Metrics**
+   - Run validation script and collect metrics
+   - Document performance improvements
+   - Verify success criteria are met
+   - Test edge cases and error conditions
+
+5. **PR Creation (Use GitHub MCP)**
+   - Commit all changes with descriptive messages
+   - Push branch to origin
+   - Use `mcp__github__create_pull_request` to create PR
+   - Include comprehensive description with:
+     - Problem statement and solution
+     - Performance metrics and validation results  
+     - Testing checklist (all items checked)
+     - Impact and value delivered
+
+6. **Documentation**
+   - Update relevant documentation
+   - Include architectural decisions
+   - Document trade-offs and alternatives considered
+
+### Testing Requirements (NON-NEGOTIABLE)
+- **Unit Tests**: Every new function, class, method
+- **Integration Tests**: Database operations, external APIs
+- **Performance Tests**: Realistic data volumes, load testing
+- **Validation Scripts**: End-to-end feature validation
+- **Error Handling**: Edge cases, failure scenarios
+- **Regression Tests**: Existing functionality preservation
+
+### PR Requirements
+- **Use GitHub MCP**: Never use external CLI tools
+- **Comprehensive Description**: Include metrics, validation, impact
+- **All Tests Passing**: 100% test success required
+- **Code Coverage**: Minimum 80% for new code
+- **Linear Link**: Always link to originating ticket
+
 ## Notes for Claude
 
+- **MANDATORY**: Always create comprehensive test suites
+- **MANDATORY**: Use GitHub MCP for all GitHub operations
+- **MANDATORY**: Create validation scripts for major features
+- **MANDATORY**: Include performance metrics in PRs
 - **Always check existing code** before implementing new functionality
 - **Use the Linear MCP server** to get full context on related tickets
 - **Consider the broader system architecture** when making implementation decisions
 - **Prioritize privacy and security** in all implementations
-- **Include proper error handling and logging** in all code
-- **Write tests alongside implementation** for reliability
 - **Document decisions and trade-offs** for future reference
+
+**Implementation is only complete when:**
+- ✅ All tests pass (unit, integration, performance)
+- ✅ Validation script created and executed successfully
+- ✅ PR created using GitHub MCP with comprehensive documentation
+- ✅ Performance metrics documented and success criteria met
+- ✅ Code coverage ≥80% for new functionality
 
 When in doubt, ask clarifying questions about requirements, architecture decisions, or integration approaches. The goal is to build a robust, scalable, and maintainable system that respects user privacy while providing intelligent communication assistance.
