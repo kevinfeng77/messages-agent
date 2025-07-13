@@ -16,8 +16,11 @@ Before implementing ANY Linear ticket, you MUST create a new worktree:
 
 2. **Create new worktree with feature branch from latest main:**
    ```bash
-   git worktree add ../message-agent-{ticket-description} -b kevin/{description-of-changes}
-   cd ../message-agent-{ticket-description}
+   # IMPORTANT: Create worktrees as subdirectories, not sibling directories
+   # This avoids Claude Code security restrictions on directory access
+   mkdir -p worktrees
+   git worktree add worktrees/{ticket-description} -b kevin/{description-of-changes}
+   cd worktrees/{ticket-description}
    ```
 
 ### Alternative: Traditional Branch Workflow (Only if worktrees unavailable)
@@ -36,9 +39,9 @@ If git worktrees are not available, fall back to standard branching:
 
 3. **List and manage worktrees:**
    ```bash
-   git worktree list              # Show all worktrees
-   git worktree remove ../path    # Remove completed worktree
-   git worktree prune            # Clean up stale worktree metadata
+   git worktree list                           # Show all worktrees
+   git worktree remove worktrees/{name}        # Remove completed worktree
+   git worktree prune                         # Clean up stale worktree metadata
    ```
 
 **Worktree Benefits:**
@@ -47,10 +50,10 @@ If git worktrees are not available, fall back to standard branching:
 - Run tests in parallel
 - Review PRs in separate directories
 
-**Example worktree names:**
-- `../message-agent-structure-fix`
-- `../message-agent-neo4j-setup`
-- `../message-agent-pr-review`
+**Example worktree names (CORRECTED):**
+- `worktrees/message-maker-data-classes`
+- `worktrees/neo4j-setup`
+- `worktrees/pr-review`
 
 **Example branch names:**
 - `kevin/message-maker-structure-fix`
@@ -405,33 +408,38 @@ git branch -d kevin/{description}
 # List all worktrees
 git worktree list
 
-# Add worktree for existing branch
-git worktree add ../message-agent-feature feature-branch-name
+# Add worktree for existing branch (CORRECTED - use subdirectories)
+git worktree add worktrees/feature-name feature-branch-name
 
-# Add worktree and create new branch
-git worktree add -b kevin/new-feature ../message-agent-new-feature
+# Add worktree and create new branch (CORRECTED - use subdirectories)
+git worktree add -b kevin/new-feature worktrees/new-feature
 
-# Add worktree for hotfix from main
-git worktree add -b kevin/hotfix-urgent ../message-agent-hotfix main
+# Add worktree for hotfix from main (CORRECTED - use subdirectories)
+git worktree add -b kevin/hotfix-urgent worktrees/hotfix-urgent main
 
-# Remove completed worktree
-git worktree remove ../message-agent-feature
+# Remove completed worktree (CORRECTED - use subdirectories)
+git worktree remove worktrees/feature-name
 
 # Clean up stale worktree metadata
 git worktree prune
 ```
 
-#### Recommended Directory Structure
+#### Recommended Directory Structure (CORRECTED)
 ```
-parent-directory/
-├── message-agent/              # Main development directory
-├── message-agent-hotfix/       # Hotfix worktree
-├── message-agent-review/       # PR review worktree
-└── message-agent-experimental/ # Experimental feature worktree
+message-agent/                          # Main repository directory
+├── src/                               # Source code
+├── worktrees/                         # Worktree subdirectories (CORRECTED)
+│   ├── hotfix-urgent/                # Hotfix worktree
+│   ├── pr-review/                    # PR review worktree  
+│   ├── message-maker-data-classes/   # Feature worktree
+│   └── experimental-feature/         # Experimental feature worktree
+└── [other repository files]
 ```
 
+**IMPORTANT SECURITY NOTE**: Claude Code restricts directory access to child directories only. Worktrees MUST be created as subdirectories (e.g., `worktrees/{name}`) rather than sibling directories (e.g., `../message-agent-{name}`) to avoid security restrictions.
+
 #### Worktree Workflow Best Practices
-1. **Consistent Naming**: Use `{repo-name}-{purpose}` pattern for worktree directories
+1. **Consistent Naming**: Use `{purpose}` or `{ticket-description}` pattern for worktree subdirectories
 2. **Regular Updates**: Keep worktrees synchronized with remote changes:
    ```bash
    # In each worktree directory
@@ -445,21 +453,21 @@ parent-directory/
    git branch --set-upstream-to=origin/feature-branch
    ```
 
-#### Advanced Worktree Workflows
+#### Advanced Worktree Workflows (CORRECTED)
 ```bash
-# Create worktree for PR review
+# Create worktree for PR review (CORRECTED - use subdirectories)
 git fetch origin pull/123/head:pr-123
-git worktree add ../message-agent-pr123 pr-123
+git worktree add worktrees/pr-123 pr-123
 
-# Cherry-pick commits between worktrees
-cd ../message-agent-feature
+# Cherry-pick commits between worktrees (CORRECTED - use subdirectories)
+cd worktrees/feature-name
 git cherry-pick <commit-hash-from-other-worktree>
 
-# Create experimental worktree from current branch
-git worktree add -b kevin/experiment ../message-agent-experiment
+# Create experimental worktree from current branch (CORRECTED - use subdirectories)
+git worktree add -b kevin/experiment worktrees/experiment
 
-# Worktree for database migration testing
-git worktree add -b kevin/migration-test ../message-agent-migration
+# Worktree for database migration testing (CORRECTED - use subdirectories)
+git worktree add -b kevin/migration-test worktrees/migration-test
 ```
 
 #### Integration with Message Agent Development
