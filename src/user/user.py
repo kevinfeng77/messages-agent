@@ -17,14 +17,16 @@ class User:
     last_name: str
     phone_number: str
     email: str
+    handle_id: Optional[int] = None
 
     def __post_init__(self):
         """Validate user data after initialization"""
         if not self.user_id:
             raise ValueError("user_id is required")
         
-        # At least one name component must be present
-        if not (self.first_name or self.last_name):
+        # At least one name component must be present, unless this is a handle-only user
+        # Handle-only users (with handle_id but no contact info) can have empty names
+        if not (self.first_name or self.last_name) and self.handle_id is None:
             raise ValueError("At least one of first_name or last_name must be provided")
         
         if not (self.phone_number or self.email):
@@ -37,7 +39,8 @@ class User:
         last_name: str,
         phone_number: Optional[str] = None,
         email: Optional[str] = None,
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        handle_id: Optional[int] = None
     ) -> 'User':
         """
         Create a User instance from address book data
@@ -48,6 +51,7 @@ class User:
             phone_number: Phone number from address book
             email: Email from address book
             user_id: Optional custom user ID (generates UUID if not provided)
+            handle_id: Optional handle ID from messages database
             
         Returns:
             User instance
@@ -68,7 +72,8 @@ class User:
             first_name=first_name,
             last_name=last_name,
             phone_number=phone_number,
-            email=email
+            email=email,
+            handle_id=handle_id
         )
 
     def to_dict(self) -> Dict[str, str]:
@@ -78,7 +83,8 @@ class User:
             'first_name': self.first_name,
             'last_name': self.last_name,
             'phone_number': self.phone_number,
-            'email': self.email
+            'email': self.email,
+            'handle_id': self.handle_id
         }
 
     def __str__(self) -> str:
