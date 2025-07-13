@@ -83,11 +83,103 @@ class MessageDecoder:
             if nsstring_idx == -1:
                 return None
 
-            # Based on analysis, the pattern is:
-            # NSString + 9 bytes + '+' + length_byte + actual_text
-            # The text consistently appears 14 bytes after NSString
+            # Try multiple patterns for locating text after NSString
+            # Pattern 1: Look for '+' followed by length byte (most common)
+            text = self._find_text_with_plus_pattern(data, nsstring_idx)
+            if text:
+                return text
 
-            text_offset = nsstring_idx + len(nsstring_marker) + 14
+            # Pattern 2: Fixed offset approach (fallback for older format)
+            text = self._find_text_with_fixed_offset(data, nsstring_idx)
+            if text:
+                return text
+
+            # Pattern 3: Scan for text patterns
+            return self._scan_for_text_after_nsstring(data, nsstring_idx)
+
+        except Exception as e:
+            logger.debug(f"NSKeyedArchiver decode failed: {e}")
+            return None
+
+    def _find_text_with_plus_pattern(
+        self, data: bytes, nsstring_idx: int
+    ) -> Optional[str]:
+        """
+        Look for text using advanced pattern recognition.
+        Handles multiple NSAttributedString encoding patterns including
+        NSDictionary metadata.
+        """
+        try:
+            # Search for the specific byte pattern that precedes text in
+            # NSAttributedString. In ROWID 224717: 0x94 0x84 0x01 0x2b LENGTH_BYTE TEXT
+            search_start = nsstring_idx + 8
+
+            # Look for the pattern: 0x94 0x84 0x01 0x2b (preceding length and text)
+            pattern = b"\x94\x84\x01\x2b"
+            pattern_idx = data.find(pattern, search_start)
+
+            if pattern_idx != -1 and pattern_idx + 5 < len(data):
+                # Length byte is right after the pattern
+                length_byte = data[pattern_idx + 4]
+
+                if 0 < length_byte <= 255:  # Reasonable length
+                    text_start = pattern_idx + 5
+                    text_end = text_start + length_byte
+
+                    if text_end <= len(data):
+                        text_bytes = data[text_start:text_end]
+                        try:
+                            decoded_text = text_bytes.decode("utf-8")
+                            if decoded_text.strip() and decoded_text.isprintable():
+                                return decoded_text.strip()
+                        except UnicodeDecodeError:
+                            pass
+
+            # Fallback: Look for '+' pattern (original logic)
+            plus_marker = b"+"
+            plus_idx = data.find(plus_marker, search_start)
+
+            if plus_idx == -1 or plus_idx + 2 >= len(data):
+                return None
+
+            # Length byte should be right after '+'
+            length_byte = data[plus_idx + 1]
+
+            if length_byte == 0 or length_byte > 1000:
+                return None
+
+            # Extract text
+            text_start = plus_idx + 2
+            text_end = text_start + length_byte
+
+            if text_end > len(data):
+                return None
+
+            text_bytes = data[text_start:text_end]
+
+            try:
+                decoded_text = text_bytes.decode("utf-8")
+                if decoded_text.strip() and decoded_text.isprintable():
+                    return decoded_text.strip()
+            except UnicodeDecodeError:
+                pass
+
+            return None
+
+        except Exception as e:
+            logger.debug(f"Plus pattern search failed: {e}")
+            return None
+
+    def _find_text_with_fixed_offset(
+        self, data: bytes, nsstring_idx: int
+    ) -> Optional[str]:
+        """
+        Use fixed offset approach for finding text after NSString.
+        This is the original logic kept as fallback.
+        """
+        try:
+            # The text consistently appears 14 bytes after NSString
+            text_offset = nsstring_idx + len(b"NSString") + 14
 
             # Make sure we have enough data
             if text_offset >= len(data):
@@ -118,11 +210,10 @@ class MessageDecoder:
             except UnicodeDecodeError:
                 pass
 
-            # If the fixed offset doesn't work, fall back to scanning
-            return self._scan_for_text_after_nsstring(data, nsstring_idx)
+            return None
 
         except Exception as e:
-            logger.debug(f"NSKeyedArchiver decode failed: {e}")
+            logger.debug(f"Fixed offset search failed: {e}")
             return None
 
     def _scan_for_text_after_nsstring(
@@ -187,9 +278,9 @@ class MessageDecoder:
                                 text = potential_string.decode("utf-8")
                                 if text.isprintable() and len(text.strip()) > 0:
                                     return text
-                            except:
+                            except UnicodeDecodeError:
                                 pass
-                    except:
+                    except (ValueError, TypeError):
                         pass
 
                 # Try reading as 2-byte length prefix
@@ -206,9 +297,9 @@ class MessageDecoder:
                                 text = potential_string.decode("utf-8")
                                 if text.isprintable() and len(text.strip()) > 0:
                                     return text
-                            except:
+                            except UnicodeDecodeError:
                                 pass
-                    except:
+                    except (ValueError, TypeError):
                         pass
 
                 i += 1
@@ -296,7 +387,7 @@ class MessageDecoder:
                             text = current_string.decode("utf-8", errors="strict")
                             if text.strip() and len(text.strip()) > 3:
                                 potential_strings.append(text.strip())
-                        except:
+                        except UnicodeDecodeError:
                             pass
                     current_string = bytearray()
 
@@ -306,7 +397,7 @@ class MessageDecoder:
                     text = current_string.decode("utf-8", errors="strict")
                     if text.strip() and len(text.strip()) > 3:
                         potential_strings.append(text.strip())
-                except:
+                except UnicodeDecodeError:
                     pass
 
             # Return the longest meaningful string found
