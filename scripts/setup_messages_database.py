@@ -240,6 +240,254 @@ def validate_test_cases(messages_db: MessagesDatabase) -> Dict[str, bool]:
     return validation_results
 
 
+def generate_chat_display_name(chat_id: int, handle_to_user: Dict[int, str], messages_db: MessagesDatabase, chat_db_path: str) -> str:
+    """
+    Generate a display name for a chat following the fallback order:
+    1. If there are users: "First Last" (single user) or "First Last, First Last, ..." (multiple users)
+    2. If no matched users, use phone number or email from handle
+    3. If no handle info, use handle.id from original table
+    4. Fall back to "Chat {chat_id}"
+    
+    Args:
+        chat_id: The chat ID
+        handle_to_user: Dictionary mapping handle_id -> user_id
+        messages_db: MessagesDatabase instance
+        chat_db_path: Path to the Messages database copy
+        
+    Returns:
+        Generated display name string
+    """
+    try:
+        # Get handle_ids for this chat
+        with sqlite3.connect(str(chat_db_path)) as conn:
+            cursor = conn.cursor()
+            
+            # Get handle information for this chat
+            cursor.execute("""
+                SELECT chj.handle_id, h.id as handle_identifier
+                FROM chat_handle_join chj
+                JOIN handle h ON chj.handle_id = h.ROWID
+                WHERE chj.chat_id = ?
+                ORDER BY chj.handle_id
+            """, (chat_id,))
+            
+            chat_handles = cursor.fetchall()
+        
+        if not chat_handles:
+            return f"Chat {chat_id}"
+        
+        # Try to get user names first
+        user_names = []
+        unmatched_handles = []
+        
+        for handle_id, handle_identifier in chat_handles:
+            if handle_id in handle_to_user:
+                user_id = handle_to_user[handle_id]
+                user = messages_db.get_user_by_id(user_id)
+                if user and user.first_name and user.last_name:
+                    full_name = f"{user.first_name} {user.last_name}".strip()
+                    if full_name and full_name != " ":
+                        user_names.append(full_name)
+                        continue
+                elif user:
+                    # Try phone or email if no names
+                    if user.phone_number and user.phone_number.strip():
+                        user_names.append(user.phone_number.strip())
+                        continue
+                    elif user.email and user.email.strip():
+                        user_names.append(user.email.strip())
+                        continue
+            
+            # If we get here, no user match or no useful user data
+            unmatched_handles.append(handle_identifier)
+        
+        # Build display name based on what we found
+        display_parts = []
+        
+        # Add user names first
+        if user_names:
+            display_parts.extend(user_names[:3])  # Limit to first 3 to avoid very long names
+        
+        # Add unmatched handle identifiers
+        if unmatched_handles and len(display_parts) < 3:
+            remaining_slots = 3 - len(display_parts)
+            display_parts.extend(unmatched_handles[:remaining_slots])
+        
+        if display_parts:
+            display_name = ", ".join(display_parts)
+            # Add "..." if there are more participants than we're showing
+            if len(chat_handles) > len(display_parts):
+                display_name += "..."
+            return display_name
+        else:
+            return f"Chat {chat_id}"
+            
+    except Exception as e:
+        logger.warning(f"Error generating display name for chat {chat_id}: {e}")
+        return f"Chat {chat_id}"
+
+
+def populate_chat_users_relationships(messages_db: MessagesDatabase, chat_db_path: str) -> Dict[str, int]:
+    """
+    Populate chat_users relationships from the Messages database
+    
+    Args:
+        messages_db: MessagesDatabase instance
+        chat_db_path: Path to the Messages database copy
+        
+    Returns:
+        Dictionary with population statistics
+    """
+    logger.info("Starting chat_users relationships population...")
+    
+    try:
+        # Extract chat-handle relationships from source database
+        chat_db_path_obj = Path(chat_db_path)
+        
+        if not chat_db_path_obj.exists():
+            logger.error(f"Messages database not found at {chat_db_path}")
+            return {"error": "Messages database not found", "relationships_created": 0}
+        
+        # Get handle_id to user_id mapping
+        handle_to_user = {}
+        all_users = messages_db.get_all_users()
+        for user in all_users:
+            if user.handle_id:
+                handle_to_user[user.handle_id] = user.user_id
+        
+        logger.info(f"Found {len(handle_to_user)} handle_id to user_id mappings")
+        
+        # Extract chat-handle relationships from source
+        relationships = []
+        with sqlite3.connect(str(chat_db_path)) as conn:
+            cursor = conn.cursor()
+            
+            # Get chat-handle relationships
+            cursor.execute("""
+                SELECT chj.chat_id, chj.handle_id
+                FROM chat_handle_join chj
+                ORDER BY chj.chat_id, chj.handle_id
+            """)
+            
+            raw_relationships = cursor.fetchall()
+            logger.info(f"Found {len(raw_relationships)} chat-handle relationships in source")
+            
+            for chat_id, handle_id in raw_relationships:
+                if handle_id in handle_to_user:
+                    user_id = handle_to_user[handle_id]
+                    relationships.append({
+                        "chat_id": int(chat_id),
+                        "user_id": user_id
+                    })
+                else:
+                    logger.debug(f"No user found for handle_id {handle_id} in chat {chat_id}")
+        
+        logger.info(f"Created {len(relationships)} chat-user relationships to insert")
+        
+        # Clear existing chat_users relationships
+        with sqlite3.connect(str(messages_db.db_path)) as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM chat_users")
+            conn.commit()
+        
+        # Insert relationships in batches
+        relationships_created = 0
+        batch_size = 1000
+        
+        for i in range(0, len(relationships), batch_size):
+            batch = relationships[i:i + batch_size]
+            
+            with sqlite3.connect(str(messages_db.db_path)) as conn:
+                cursor = conn.cursor()
+                
+                for rel in batch:
+                    try:
+                        cursor.execute(
+                            "INSERT OR IGNORE INTO chat_users (chat_id, user_id) VALUES (?, ?)",
+                            (rel["chat_id"], rel["user_id"])
+                        )
+                        relationships_created += 1
+                    except sqlite3.Error as e:
+                        logger.warning(f"Error inserting chat_user relationship {rel}: {e}")
+                
+                conn.commit()
+            
+            logger.info(f"Inserted batch {i//batch_size + 1}: {len(batch)} relationships")
+        
+        # Update chat display names for chats with empty/default display names
+        logger.info("Updating chat display names for chats with default names...")
+        chats_updated = 0
+        
+        with sqlite3.connect(str(messages_db.db_path)) as conn:
+            cursor = conn.cursor()
+            
+            # Find chats that have default display names (start with "Chat ")
+            cursor.execute("""
+                SELECT chat_id, display_name 
+                FROM chats 
+                WHERE display_name LIKE 'Chat %' OR display_name IS NULL OR display_name = ''
+            """)
+            
+            chats_to_update = cursor.fetchall()
+            logger.info(f"Found {len(chats_to_update)} chats with default display names to update")
+            
+            for chat_id, current_display_name in chats_to_update:
+                try:
+                    new_display_name = generate_chat_display_name(chat_id, handle_to_user, messages_db, chat_db_path)
+                    
+                    # Only update if the new name is different and better than default
+                    if new_display_name != current_display_name and not new_display_name.startswith("Chat "):
+                        cursor.execute(
+                            "UPDATE chats SET display_name = ? WHERE chat_id = ?",
+                            (new_display_name, chat_id)
+                        )
+                        chats_updated += 1
+                        logger.debug(f"Updated chat {chat_id}: '{current_display_name}' -> '{new_display_name}'")
+                
+                except Exception as e:
+                    logger.warning(f"Error updating display name for chat {chat_id}: {e}")
+            
+            conn.commit()
+        
+        logger.info(f"Updated display names for {chats_updated} chats")
+        
+        # Get statistics
+        with sqlite3.connect(str(messages_db.db_path)) as conn:
+            cursor = conn.cursor()
+            
+            # Count chats with users
+            cursor.execute("""
+                SELECT COUNT(DISTINCT c.chat_id)
+                FROM chats c
+                JOIN chat_users cu ON c.chat_id = cu.chat_id
+            """)
+            chats_with_users = cursor.fetchone()[0]
+            
+            # Count chats without users
+            cursor.execute("""
+                SELECT COUNT(*)
+                FROM chats c
+                LEFT JOIN chat_users cu ON c.chat_id = cu.chat_id
+                WHERE cu.chat_id IS NULL
+            """)
+            chats_without_users = cursor.fetchone()[0]
+        
+        logger.info(f"Successfully created {relationships_created} chat-user relationships")
+        
+        return {
+            "relationships_created": relationships_created,
+            "chats_with_users": chats_with_users,
+            "chats_without_users": chats_without_users,
+            "total_relationships_found": len(raw_relationships),
+            "relationships_mapped": len(relationships),
+            "display_names_updated": chats_updated
+        }
+        
+    except Exception as e:
+        logger.error(f"Error during chat_users relationships population: {e}")
+        return {"error": str(e), "relationships_created": 0}
+
+
 def populate_messages_table(db_path: str, chat_db_path: str) -> Dict[str, int]:
     """
     Populate the messages table from the Messages database
@@ -436,8 +684,27 @@ def main():
     print(f"   - Chat-message relationships migrated: {chat_messages_migrated}")
     print(f"   - Migration coverage: {coverage:.1f}%")
 
-    # Step 9: Final database statistics
-    print("\n9. Final database statistics:")
+    # Step 9: Populate chat_users relationships
+    print("\n9. Populating chat-user relationships...")
+    chat_users_stats = populate_chat_users_relationships(messages_db, chat_db_path)
+    
+    if "error" in chat_users_stats:
+        print(f"❌ Chat-user relationships migration failed: {chat_users_stats['error']}")
+        return False
+    
+    relationships_created = chat_users_stats.get("relationships_created", 0)
+    chats_with_users = chat_users_stats.get("chats_with_users", 0)
+    chats_without_users = chat_users_stats.get("chats_without_users", 0)
+    display_names_updated = chat_users_stats.get("display_names_updated", 0)
+    
+    print(f"✅ Chat-user relationships migration completed:")
+    print(f"   - Relationships created: {relationships_created}")
+    print(f"   - Chats with users: {chats_with_users}")
+    print(f"   - Chats without users: {chats_without_users}")
+    print(f"   - Display names updated: {display_names_updated}")
+
+    # Step 10: Final database statistics
+    print("\n10. Final database statistics:")
     db_stats = messages_db.get_database_stats()
 
     # Calculate handle-specific stats
