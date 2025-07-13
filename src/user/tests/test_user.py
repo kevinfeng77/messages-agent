@@ -66,7 +66,7 @@ class TestUser(unittest.TestCase):
             )
 
     def test_user_creation_invalid_no_name(self):
-        """Test that user creation fails without first and last name"""
+        """Test that user creation fails without any name"""
         with self.assertRaises(ValueError):
             User(
                 user_id="test-123",
@@ -75,6 +75,32 @@ class TestUser(unittest.TestCase):
                 phone_number="(555) 123-4567",
                 email="john@example.com"
             )
+
+    def test_user_creation_first_name_only(self):
+        """Test creating user with only first name"""
+        user = User(
+            user_id="test-123",
+            first_name="John",
+            last_name="",
+            phone_number="(555) 123-4567",
+            email="john@example.com"
+        )
+        
+        self.assertEqual(user.first_name, "John")
+        self.assertEqual(user.last_name, "")
+
+    def test_user_creation_last_name_only(self):
+        """Test creating user with only last name"""
+        user = User(
+            user_id="test-123",
+            first_name="",
+            last_name="Doe",
+            phone_number="(555) 123-4567",
+            email="john@example.com"
+        )
+        
+        self.assertEqual(user.first_name, "")
+        self.assertEqual(user.last_name, "Doe")
 
     def test_user_creation_invalid_no_contact(self):
         """Test that user creation fails without phone or email"""

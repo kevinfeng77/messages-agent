@@ -20,8 +20,12 @@ class User:
 
     def __post_init__(self):
         """Validate user data after initialization"""
-        if not all([self.user_id, self.first_name, self.last_name]):
-            raise ValueError("user_id, first_name, and last_name are required")
+        if not self.user_id:
+            raise ValueError("user_id is required")
+        
+        # At least one name component must be present
+        if not (self.first_name or self.last_name):
+            raise ValueError("At least one of first_name or last_name must be provided")
         
         if not (self.phone_number or self.email):
             raise ValueError("At least one of phone_number or email must be provided")
