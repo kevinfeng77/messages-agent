@@ -61,13 +61,17 @@ class TestAddressBookExtractor(unittest.TestCase):
     def test_get_extraction_stats(self):
         """Test getting extraction statistics"""
         stats = self.extractor.get_extraction_stats()
-        
+
         # Check that we get expected keys
         expected_keys = [
-            'total_databases', 'database_paths', 'total_records',
-            'records_with_phone', 'records_with_email', 'unique_contacts'
+            "total_databases",
+            "database_paths",
+            "total_records",
+            "records_with_phone",
+            "records_with_email",
+            "unique_contacts",
         ]
-        
+
         for key in expected_keys:
             self.assertIn(key, stats)
             self.assertIsInstance(stats[key], (int, list))
@@ -77,7 +81,7 @@ class TestAddressBookExtractor(unittest.TestCase):
         # This test may fail on systems without AddressBook data
         try:
             users = self.extractor.extract_users()
-            
+
             # If we get users, validate their structure
             if users:
                 for user in users[:5]:  # Test first 5 users
@@ -85,20 +89,20 @@ class TestAddressBookExtractor(unittest.TestCase):
                     self.assertTrue(user.user_id)
                     self.assertTrue(user.first_name or user.last_name)
                     self.assertTrue(user.phone_number or user.email)
-                    
+
                     # Test that user can be converted to dict
                     user_dict = user.to_dict()
-                    self.assertIn('user_id', user_dict)
-                    self.assertIn('first_name', user_dict)
-                    self.assertIn('last_name', user_dict)
-                    
+                    self.assertIn("user_id", user_dict)
+                    self.assertIn("first_name", user_dict)
+                    self.assertIn("last_name", user_dict)
+
             # Even if no users found, ensure we get a list
             self.assertIsInstance(users, list)
-            
+
         except Exception as e:
             # If extraction fails (e.g., no AddressBook), skip the test
             self.skipTest(f"Address book extraction failed: {e}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -19,9 +19,9 @@ class TestUser(unittest.TestCase):
             first_name="John",
             last_name="Doe",
             phone_number="(555) 123-4567",
-            email="john@example.com"
+            email="john@example.com",
         )
-        
+
         self.assertEqual(user.user_id, "test-123")
         self.assertEqual(user.first_name, "John")
         self.assertEqual(user.last_name, "Doe")
@@ -35,9 +35,9 @@ class TestUser(unittest.TestCase):
             first_name="John",
             last_name="Doe",
             phone_number="(555) 123-4567",
-            email=""
+            email="",
         )
-        
+
         self.assertEqual(user.phone_number, "(555) 123-4567")
         self.assertEqual(user.email, "")
 
@@ -48,9 +48,9 @@ class TestUser(unittest.TestCase):
             first_name="John",
             last_name="Doe",
             phone_number="",
-            email="john@example.com"
+            email="john@example.com",
         )
-        
+
         self.assertEqual(user.phone_number, "")
         self.assertEqual(user.email, "john@example.com")
 
@@ -62,7 +62,7 @@ class TestUser(unittest.TestCase):
                 first_name="John",
                 last_name="Doe",
                 phone_number="(555) 123-4567",
-                email="john@example.com"
+                email="john@example.com",
             )
 
     def test_user_creation_invalid_no_name(self):
@@ -73,7 +73,7 @@ class TestUser(unittest.TestCase):
                 first_name="",
                 last_name="",
                 phone_number="(555) 123-4567",
-                email="john@example.com"
+                email="john@example.com",
             )
 
     def test_user_creation_first_name_only(self):
@@ -83,9 +83,9 @@ class TestUser(unittest.TestCase):
             first_name="John",
             last_name="",
             phone_number="(555) 123-4567",
-            email="john@example.com"
+            email="john@example.com",
         )
-        
+
         self.assertEqual(user.first_name, "John")
         self.assertEqual(user.last_name, "")
 
@@ -96,9 +96,9 @@ class TestUser(unittest.TestCase):
             first_name="",
             last_name="Doe",
             phone_number="(555) 123-4567",
-            email="john@example.com"
+            email="john@example.com",
         )
-        
+
         self.assertEqual(user.first_name, "")
         self.assertEqual(user.last_name, "Doe")
 
@@ -110,7 +110,7 @@ class TestUser(unittest.TestCase):
                 first_name="John",
                 last_name="Doe",
                 phone_number="",
-                email=""
+                email="",
             )
 
     def test_from_address_book_record_valid(self):
@@ -119,9 +119,9 @@ class TestUser(unittest.TestCase):
             first_name="Jane",
             last_name="Smith",
             phone_number="(555) 987-6543",
-            email="jane@example.com"
+            email="jane@example.com",
         )
-        
+
         self.assertEqual(user.first_name, "Jane")
         self.assertEqual(user.last_name, "Smith")
         self.assertEqual(user.phone_number, "(555) 987-6543")
@@ -131,22 +131,18 @@ class TestUser(unittest.TestCase):
     def test_from_address_book_record_phone_only(self):
         """Test creating user from address book with phone only"""
         user = User.from_address_book_record(
-            first_name="Bob",
-            last_name="Johnson",
-            phone_number="(555) 555-5555"
+            first_name="Bob", last_name="Johnson", phone_number="(555) 555-5555"
         )
-        
+
         self.assertEqual(user.phone_number, "(555) 555-5555")
         self.assertEqual(user.email, "")
 
     def test_from_address_book_record_email_only(self):
         """Test creating user from address book with email only"""
         user = User.from_address_book_record(
-            first_name="Alice",
-            last_name="Brown",
-            email="alice@example.com"
+            first_name="Alice", last_name="Brown", email="alice@example.com"
         )
-        
+
         self.assertEqual(user.phone_number, "")
         self.assertEqual(user.email, "alice@example.com")
 
@@ -157,18 +153,15 @@ class TestUser(unittest.TestCase):
             first_name="Custom",
             last_name="User",
             phone_number="(555) 111-2222",
-            user_id=custom_id
+            user_id=custom_id,
         )
-        
+
         self.assertEqual(user.user_id, custom_id)
 
     def test_from_address_book_record_invalid_no_contact(self):
         """Test that creation fails without contact info"""
         with self.assertRaises(ValueError):
-            User.from_address_book_record(
-                first_name="Invalid",
-                last_name="User"
-            )
+            User.from_address_book_record(first_name="Invalid", last_name="User")
 
     def test_to_dict(self):
         """Test converting user to dictionary"""
@@ -177,17 +170,17 @@ class TestUser(unittest.TestCase):
             first_name="John",
             last_name="Doe",
             phone_number="(555) 123-4567",
-            email="john@example.com"
+            email="john@example.com",
         )
-        
+
         expected_dict = {
-            'user_id': 'test-123',
-            'first_name': 'John',
-            'last_name': 'Doe',
-            'phone_number': '(555) 123-4567',
-            'email': 'john@example.com'
+            "user_id": "test-123",
+            "first_name": "John",
+            "last_name": "Doe",
+            "phone_number": "(555) 123-4567",
+            "email": "john@example.com",
         }
-        
+
         self.assertEqual(user.to_dict(), expected_dict)
 
     def test_str_representation_full(self):
@@ -197,9 +190,9 @@ class TestUser(unittest.TestCase):
             first_name="John",
             last_name="Doe",
             phone_number="(555) 123-4567",
-            email="john@example.com"
+            email="john@example.com",
         )
-        
+
         str_repr = str(user)
         self.assertIn("John Doe", str_repr)
         self.assertIn("phone: (555) 123-4567", str_repr)
@@ -212,9 +205,9 @@ class TestUser(unittest.TestCase):
             first_name="John",
             last_name="Doe",
             phone_number="(555) 123-4567",
-            email=""
+            email="",
         )
-        
+
         str_repr = str(user)
         self.assertIn("John Doe", str_repr)
         self.assertIn("phone: (555) 123-4567", str_repr)
@@ -227,16 +220,14 @@ class TestUser(unittest.TestCase):
             first_name="John",
             last_name="Doe",
             phone_number="",
-            email="john@example.com"
+            email="john@example.com",
         )
-        
+
         str_repr = str(user)
         self.assertIn("John Doe", str_repr)
         self.assertIn("email: john@example.com", str_repr)
         self.assertNotIn("phone:", str_repr)
 
 
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
