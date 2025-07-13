@@ -8,8 +8,8 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from message_decoder import MessageDecoder, extract_message_text
-from logger_config import setup_logging
+from src.messaging.decoder import MessageDecoder, extract_message_text
+from src.utils.logger_config import setup_logging
 
 def test_decoder():
     """Test the message decoder with real data"""

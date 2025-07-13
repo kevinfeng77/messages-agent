@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .message_decoder import MessageDecoder, extract_message_text
+from src.messaging.decoder import MessageDecoder, extract_message_text
 
 logger = logging.getLogger(__name__)
 

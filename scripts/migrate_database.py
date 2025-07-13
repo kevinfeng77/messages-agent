@@ -4,12 +4,12 @@
 import sys
 from pathlib import Path
 
-# Add src to path
-sys.path.insert(0, str(Path(__file__).parent))
+# Add parent directory to path for src package
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.database_manager import DatabaseManager
-from src.database_migrator import DatabaseMigrator
-from src.logger_config import setup_logging, get_logger
+from src.database.manager import DatabaseManager
+from src.database.migrator import DatabaseMigrator
+from src.utils.logger_config import setup_logging, get_logger
 
 def main():
     """Main migration workflow"""
