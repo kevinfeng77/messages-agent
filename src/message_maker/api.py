@@ -50,26 +50,35 @@ class MessageMakerService:
             self.logger.error(f"Input validation failed: {e}")
             raise
         
-        # 2. Retrieve Chat History
+        # 2. Retrieve Chat History (limit to recent messages to avoid token limits)
         try:
             chat_history = get_chat_history_for_message_generation(
                 chat_id=str(request.chat_id),
                 user_id=request.user_id
             )
-            self.logger.info(f"Retrieved {len(chat_history)} messages from chat history")
+            
+            # Limit to most recent messages to avoid token limits (40k tokens/min = ~5000 messages)
+            original_count = len(chat_history)
+            max_messages = 2000  # Testing with 2000 messages as requested
+            if original_count > max_messages:
+                chat_history = chat_history[-max_messages:]
+                self.logger.info(f"Limited chat history to most recent {max_messages} messages (from {original_count} total)")
+            
+            self.logger.info(f"Using {len(chat_history)} messages from chat history")
         except Exception as e:
             self.logger.error(f"Failed to retrieve chat history: {e}")
             raise Exception(f"Database error: {e}")
         
         # 3. Prepare LLM Prompt
+        from datetime import datetime
         new_message = NewMessage(
-            content=request.contents,
-            timestamp=None  # Not required for response generation
+            contents=request.contents,
+            created_at=datetime.now().isoformat()
         )
         
         prompt_data = LLMPromptData(
-            system_prompt="",  # Will be set by LLM client
-            user_prompt="",    # Will be set by LLM client  
+            system_prompt="placeholder",  # LLM client uses its own templates
+            user_prompt="placeholder",    # LLM client uses its own templates
             chat_history=chat_history,
             new_message=new_message
         )
