@@ -177,6 +177,21 @@ tests/
     └── validate_[feature_name].py
 ```
 
+### For Script Organization (MANDATORY)
+**All scripts must be organized into proper subdirectories:**
+- **Migration Scripts**: Place in `scripts/migration/` directory
+- **Validation Scripts**: Place in `scripts/validation/` directory
+- **Debug Scripts**: Place in `scripts/debug/` directory
+- **Main Orchestration Scripts**: Keep in root `scripts/` directory
+
+**Script Organization Rules:**
+- Migration scripts handle database schema changes and data migration
+- Validation scripts verify implementation correctness and test specific requirements
+- Debug scripts provide diagnostic and troubleshooting capabilities
+- Never leave migration or validation scripts in the root scripts directory
+- Update import paths when moving scripts to subdirectories
+- Update README files in each subdirectory to document new scripts
+
 ## Git Workflow & Branch Management
 
 ### Branch Naming Convention

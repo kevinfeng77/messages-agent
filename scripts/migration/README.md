@@ -10,6 +10,13 @@ Adds the `handle_id` column to existing users tables:
 - Creates appropriate indexes for performance
 - Handles cases where column already exists
 
+### `migrate_chats.py`
+Migrates chat data from Messages database to normalized structure:
+- Extracts chats and handles from Messages database
+- Maps handle_ids to user_ids using existing users table
+- Creates normalized chats and chat_users tables
+- Validates migration completeness
+
 ### `migrate_database.py`
 Performs comprehensive database migrations:
 - Migrates Messages database to include contact information
@@ -23,6 +30,9 @@ Run migration scripts from the project root:
 ```bash
 # Add handle_id column to existing database
 python scripts/migration/migrate_add_handle_id_column.py
+
+# Migrate chat data from Messages database
+python scripts/migration/migrate_chats.py
 
 # Perform full database migration with contacts
 python scripts/migration/migrate_database.py

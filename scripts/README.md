@@ -13,8 +13,10 @@ scripts/
 │   └── debug_binary.py            # Binary encoding diagnostics
 ├── migration/                      # Database migration scripts
 │   ├── migrate_add_handle_id_column.py  # Add handle_id column
+│   ├── migrate_chats.py           # Chat table migration
 │   └── migrate_database.py        # Full database migration
 └── validation/                     # Validation and testing scripts
+    ├── validate_chat_migration.py # Chat migration validation
     ├── validate_handle_id_implementation.py  # Handle ID validation
     ├── validate_implementation.py # General validation
     └── validate_messages_database.py         # Database validation
