@@ -11,7 +11,7 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Union, Dict, Any, Optional
+from typing import Any, Dict, Optional, Union
 
 from dotenv import load_dotenv
 from graphiti_core import Graphiti
