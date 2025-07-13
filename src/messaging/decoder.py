@@ -158,9 +158,12 @@ class MessageDecoder:
             text_bytes = data[text_start:text_end]
 
             try:
-                decoded_text = text_bytes.decode("utf-8")
-                if decoded_text.strip() and decoded_text.isprintable():
-                    return decoded_text.strip()
+                # Handle case where length byte includes trailing bytes
+                decoded_text = text_bytes.decode("utf-8", errors="ignore")
+                # Clean up any non-printable characters that might be included
+                clean_text = ''.join(c for c in decoded_text if c.isprintable())
+                if clean_text.strip():
+                    return clean_text.strip()
             except UnicodeDecodeError:
                 pass
 
@@ -246,9 +249,12 @@ class MessageDecoder:
             text_bytes = data[text_start:text_end]
 
             try:
-                decoded_text = text_bytes.decode("utf-8")
-                if decoded_text.strip() and decoded_text.isprintable():
-                    return decoded_text.strip()
+                # Handle case where length byte includes trailing bytes
+                decoded_text = text_bytes.decode("utf-8", errors="ignore")
+                # Clean up any non-printable characters that might be included
+                clean_text = ''.join(c for c in decoded_text if c.isprintable())
+                if clean_text.strip():
+                    return clean_text.strip()
             except UnicodeDecodeError:
                 pass
 
@@ -415,6 +421,7 @@ class MessageDecoder:
                             "nsarchive",
                             "streamtyped",
                             "nskeyedarchiver",
+                            "nsobject",
                         ]
                     ):
                         if len(s) > 3 and any(c.isalpha() for c in s):
