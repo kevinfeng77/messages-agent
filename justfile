@@ -25,12 +25,20 @@ setup: clean copy create
 # Copy Messages database to working directory
 copy:
     @echo "📋 Copying Messages database..."
-    python scripts/copy_messages_database.py
+    @if command -v python3 >/dev/null 2>&1; then \
+        python3 scripts/copy_messages_database.py; \
+    else \
+        python scripts/copy_messages_database.py; \
+    fi
 
 # Create and populate the messages.db database
 create:
     @echo "🗄️ Creating and populating messages database..."
-    python scripts/setup_messages_database.py
+    @if command -v python3 >/dev/null 2>&1; then \
+        python3 scripts/setup_messages_database.py; \
+    else \
+        python scripts/setup_messages_database.py; \
+    fi
 
 # Clean the data directory 
 clean:
@@ -44,17 +52,29 @@ test:
     @echo "🧪 Running all tests..."
     @if command -v pytest >/dev/null 2>&1; then \
         echo "Using pytest..."; \
-        python -m pytest tests/ -v; \
+        if command -v python3 >/dev/null 2>&1; then \
+            python3 -m pytest tests/ -v; \
+        else \
+            python -m pytest tests/ -v; \
+        fi; \
     else \
         echo "pytest not found, using unittest..."; \
         echo "To install pytest: pip install -r requirements.txt"; \
-        python -m unittest discover tests/ -v; \
+        if command -v python3 >/dev/null 2>&1; then \
+            python3 -m unittest discover tests/ -v; \
+        else \
+            python -m unittest discover tests/ -v; \
+        fi; \
     fi
 
 # Run tests with unittest (fallback option)
 test-unit:
     @echo "🧪 Running tests with unittest..."
-    python -m unittest discover tests/ -v
+    @if command -v python3 >/dev/null 2>&1; then \
+        python3 -m unittest discover tests/ -v; \
+    else \
+        python -m unittest discover tests/ -v; \
+    fi
 
 # Install testing dependencies
 test-install:
@@ -64,21 +84,38 @@ test-install:
 # Run validation scripts
 validate:
     @echo "✅ Running validation scripts..."
-    python scripts/validation/validate_messages_table.py
-    python scripts/validation/validate_chat_migration.py
+    @if command -v python3 >/dev/null 2>&1; then \
+        python3 scripts/validation/validate_messages_table.py; \
+        python3 scripts/validation/validate_chat_migration.py; \
+    else \
+        python scripts/validation/validate_messages_table.py; \
+        python scripts/validation/validate_chat_migration.py; \
+    fi
 
 # Development helpers
 lint:
     @echo "🔍 Running code quality checks..."
-    black --check scripts/ src/
-    isort --check-only scripts/ src/
-    flake8 scripts/ src/
-    mypy src/
+    @if command -v python3 >/dev/null 2>&1; then \
+        python3 -m black --check scripts/ src/; \
+        python3 -m isort --check-only scripts/ src/; \
+        python3 -m flake8 scripts/ src/; \
+        python3 -m mypy src/; \
+    else \
+        python -m black --check scripts/ src/; \
+        python -m isort --check-only scripts/ src/; \
+        python -m flake8 scripts/ src/; \
+        python -m mypy src/; \
+    fi
 
 format:
     @echo "📝 Formatting code..."
-    black scripts/ src/
-    isort scripts/ src/
+    @if command -v python3 >/dev/null 2>&1; then \
+        python3 -m black scripts/ src/; \
+        python3 -m isort scripts/ src/; \
+    else \
+        python -m black scripts/ src/; \
+        python -m isort scripts/ src/; \
+    fi
 
 # Show database statistics
 stats:
