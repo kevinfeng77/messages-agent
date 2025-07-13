@@ -16,16 +16,19 @@ from src.utils.logger_config import get_logger
 logger = get_logger(__name__)
 
 
-def get_chat_history_for_message_generation(chat_id: str, user_id: str) -> List[ChatMessage]:
+def get_chat_history_for_message_generation(chat_id: str, user_id: str = None) -> List[ChatMessage]:
     """
     Retrieve all messages in a chat, formatted for LLM consumption.
     
     This function joins the chat_messages and messages tables to get the full
     conversation history, ordered chronologically for proper context.
     
+    In this data model, "me" is implicit - the is_from_me field in the database
+    already indicates whether each message was sent by the requesting user.
+    
     Args:
         chat_id: Chat ID to retrieve messages for
-        user_id: User ID making the request (to determine is_from_me)
+        user_id: User ID making the request (optional, not used for is_from_me determination)
         
     Returns:
         List of ChatMessage objects ordered chronologically (oldest first)
@@ -41,7 +44,7 @@ def get_chat_history_for_message_generation(chat_id: str, user_id: str) -> List[
         logger.error(f"Invalid chat_id format: {chat_id}. Must be convertible to integer.")
         raise ValueError(f"chat_id must be convertible to integer, got: {chat_id}")
 
-    logger.info(f"Retrieving chat history for chat_id={chat_id_int}, user_id={user_id}")
+    logger.info(f"Retrieving chat history for chat_id={chat_id_int}")
 
     # Use default database path
     db_path = Path("./data/messages.db")
@@ -52,8 +55,9 @@ def get_chat_history_for_message_generation(chat_id: str, user_id: str) -> List[
 
             # Query to join chat_messages and messages tables
             # Order by message_date for chronological context (oldest first)
+            # Note: In this data model, "me" is implicit - is_from_me field indicates if message is from the requesting user
             query = """
-                SELECT m.contents, m.user_id, m.created_at
+                SELECT m.contents, m.is_from_me, m.created_at
                 FROM messages m
                 JOIN chat_messages cm ON m.message_id = cm.message_id
                 WHERE cm.chat_id = ?
@@ -70,13 +74,13 @@ def get_chat_history_for_message_generation(chat_id: str, user_id: str) -> List[
             # Convert database results to ChatMessage objects
             chat_messages = []
             for row in rows:
-                contents, db_user_id, created_at = row
+                contents, is_from_me, created_at = row
 
                 # Create ChatMessage for LLM consumption
-                # is_from_me is determined relative to the requesting user_id
+                # Use the is_from_me field directly from the database since "me" is implicit
                 chat_message = ChatMessage(
                     contents=contents,
-                    is_from_me=(db_user_id == user_id),
+                    is_from_me=bool(is_from_me),
                     created_at=created_at
                 )
 
