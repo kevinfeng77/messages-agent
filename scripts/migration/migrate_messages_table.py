@@ -388,6 +388,10 @@ class MessagesTableMigrator:
                 for row in raw_chats:
                     chat_id, display_name = row
 
+                    # Handle NULL or empty display names
+                    if not display_name or display_name.strip() == "":
+                        display_name = f"Chat {chat_id}"
+
                     chat_data = {
                         "chat_id": int(chat_id),
                         "display_name": display_name,  # Keep original, will be enhanced later
