@@ -166,21 +166,31 @@ class TestChatHistoryFunction(unittest.TestCase):
         self.assertEqual(actual_is_from_me, expected_is_from_me)
 
     @patch('src.message_maker.chat_history.Path')
-    def test_get_chat_history_different_user_perspective(self, mock_path):
-        """Test that is_from_me is correctly determined for different users."""
+    def test_get_chat_history_consistent_is_from_me(self, mock_path):
+        """Test that is_from_me is consistent regardless of user_id parameter."""
         # Mock the database path to use our test database
         mock_path.return_value = Path(self.db_path)
 
-        # Test from user2's perspective  
-        messages = get_chat_history_for_message_generation(
+        # Test with different user_id parameters
+        messages1 = get_chat_history_for_message_generation(
+            chat_id=str(self.test_chat_id),
+            user_id="user1"
+        )
+        
+        messages2 = get_chat_history_for_message_generation(
             chat_id=str(self.test_chat_id),
             user_id="user2"
         )
 
-        # Verify is_from_me is correctly set relative to user2
-        expected_is_from_me = [False, True, False, True]
-        actual_is_from_me = [msg.is_from_me for msg in messages]
-        self.assertEqual(actual_is_from_me, expected_is_from_me)
+        # In the implicit "me" data model, is_from_me should be the same
+        # regardless of user_id parameter since it's stored in the database
+        is_from_me_1 = [msg.is_from_me for msg in messages1]
+        is_from_me_2 = [msg.is_from_me for msg in messages2]
+        self.assertEqual(is_from_me_1, is_from_me_2)
+        
+        # Verify the expected pattern from our test data
+        expected_is_from_me = [True, False, True, False]
+        self.assertEqual(is_from_me_1, expected_is_from_me)
 
     @patch('src.message_maker.chat_history.Path')
     def test_get_chat_history_empty_chat(self, mock_path):
