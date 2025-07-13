@@ -137,10 +137,13 @@ class MessagesTableMigrator:
                         continue
 
                     # Convert macOS timestamp to ISO format
-                    # macOS uses seconds since 2001-01-01, convert to Unix timestamp
+                    # macOS uses nanoseconds since 2001-01-01, convert to Unix timestamp
                     if date:
                         try:
-                            unix_timestamp = date + 978307200  # Offset from 2001-01-01 to 1970-01-01
+                            # Convert nanoseconds to seconds since 2001-01-01
+                            seconds_since_2001 = date / 1_000_000_000
+                            # Add offset from 2001-01-01 to 1970-01-01 (Unix epoch)
+                            unix_timestamp = seconds_since_2001 + 978307200
                             # Validate timestamp is reasonable (between 1970 and 2100)
                             if 0 <= unix_timestamp <= 4102444800:  # 2100-01-01
                                 created_at = datetime.fromtimestamp(unix_timestamp).isoformat()
@@ -157,7 +160,7 @@ class MessagesTableMigrator:
                     user_id = handle_identifier if handle_identifier else f"unknown_user_{handle_id}"
 
                     message_data = {
-                        "message_id": str(message_id),
+                        "message_id": int(message_id),
                         "user_id": user_id,
                         "contents": decoded_text,
                         "is_from_me": bool(is_from_me),

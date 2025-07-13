@@ -54,11 +54,11 @@ class TestMessagesTable(unittest.TestCase):
             
             # Expected columns: (cid, name, type, notnull, dflt_value, pk)
             expected_columns = {
-                "message_id": ("TEXT", 1, 1),  # (type, notnull, pk)
+                "message_id": ("INTEGER", 1, 1),  # (type, notnull, pk)
                 "user_id": ("TEXT", 1, 0),
                 "contents": ("TEXT", 1, 0),
                 "is_from_me": ("BOOLEAN", 0, 0),
-                "created_at": ("TEXT", 1, 0),
+                "created_at": ("TIMESTAMP", 1, 0),
             }
             
             for column in columns:
@@ -94,7 +94,7 @@ class TestMessagesTable(unittest.TestCase):
     def test_insert_single_message(self):
         """Test inserting a single message"""
         message_data = {
-            "message_id": "msg_001",
+            "message_id": 1,
             "user_id": "user_001", 
             "contents": "Hello, world!",
             "is_from_me": True,
@@ -105,9 +105,9 @@ class TestMessagesTable(unittest.TestCase):
         self.assertTrue(success)
         
         # Verify the message was inserted
-        retrieved_message = self.messages_db.get_message_by_id("msg_001")
+        retrieved_message = self.messages_db.get_message_by_id(1)
         self.assertIsNotNone(retrieved_message)
-        self.assertEqual(retrieved_message["message_id"], "msg_001")
+        self.assertEqual(retrieved_message["message_id"], 1)
         self.assertEqual(retrieved_message["user_id"], "user_001")
         self.assertEqual(retrieved_message["contents"], "Hello, world!")
         self.assertEqual(retrieved_message["is_from_me"], True)
@@ -116,7 +116,7 @@ class TestMessagesTable(unittest.TestCase):
     def test_insert_message_with_special_characters(self):
         """Test inserting a message with special characters and emojis"""
         message_data = {
-            "message_id": "msg_002",
+            "message_id": 2,
             "user_id": "user_002",
             "contents": "Hello! 👋 This has special chars: 'quotes', \"double quotes\", & ampersands",
             "is_from_me": False,
@@ -126,7 +126,7 @@ class TestMessagesTable(unittest.TestCase):
         success = self.messages_db.insert_message(**message_data)
         self.assertTrue(success)
         
-        retrieved_message = self.messages_db.get_message_by_id("msg_002")
+        retrieved_message = self.messages_db.get_message_by_id(2)
         self.assertIsNotNone(retrieved_message)
         self.assertEqual(retrieved_message["contents"], message_data["contents"])
 
@@ -134,7 +134,7 @@ class TestMessagesTable(unittest.TestCase):
         """Test batch insertion of multiple messages"""
         messages = [
             {
-                "message_id": f"msg_{i:03d}",
+                "message_id": i + 1,
                 "user_id": f"user_{i % 3}",  # 3 different users
                 "contents": f"Message content {i}",
                 "is_from_me": i % 2 == 0,  # Alternate between True/False
@@ -154,7 +154,7 @@ class TestMessagesTable(unittest.TestCase):
         """Test retrieving a message by its ID"""
         # Insert test message
         message_data = {
-            "message_id": "test_msg",
+            "message_id": 999,
             "user_id": "test_user",
             "contents": "Test message content",
             "is_from_me": True,
@@ -163,22 +163,22 @@ class TestMessagesTable(unittest.TestCase):
         self.messages_db.insert_message(**message_data)
         
         # Test successful retrieval
-        retrieved = self.messages_db.get_message_by_id("test_msg")
+        retrieved = self.messages_db.get_message_by_id(999)
         self.assertIsNotNone(retrieved)
-        self.assertEqual(retrieved["message_id"], "test_msg")
+        self.assertEqual(retrieved["message_id"], 999)
         
         # Test non-existent message
-        non_existent = self.messages_db.get_message_by_id("nonexistent")
+        non_existent = self.messages_db.get_message_by_id(9999)
         self.assertIsNone(non_existent)
 
     def test_get_messages_by_user(self):
         """Test retrieving messages for a specific user"""
         # Insert messages for different users
         messages = [
-            {"message_id": "msg_1", "user_id": "user_a", "contents": "Message 1", "is_from_me": True, "created_at": "2023-12-01T10:00:00"},
-            {"message_id": "msg_2", "user_id": "user_a", "contents": "Message 2", "is_from_me": False, "created_at": "2023-12-01T10:01:00"},
-            {"message_id": "msg_3", "user_id": "user_b", "contents": "Message 3", "is_from_me": True, "created_at": "2023-12-01T10:02:00"},
-            {"message_id": "msg_4", "user_id": "user_a", "contents": "Message 4", "is_from_me": True, "created_at": "2023-12-01T10:03:00"},
+            {"message_id": 1, "user_id": "user_a", "contents": "Message 1", "is_from_me": True, "created_at": "2023-12-01T10:00:00"},
+            {"message_id": 2, "user_id": "user_a", "contents": "Message 2", "is_from_me": False, "created_at": "2023-12-01T10:01:00"},
+            {"message_id": 3, "user_id": "user_b", "contents": "Message 3", "is_from_me": True, "created_at": "2023-12-01T10:02:00"},
+            {"message_id": 4, "user_id": "user_a", "contents": "Message 4", "is_from_me": True, "created_at": "2023-12-01T10:03:00"},
         ]
         
         for msg in messages:
@@ -189,20 +189,20 @@ class TestMessagesTable(unittest.TestCase):
         self.assertEqual(len(user_a_messages), 3)
         
         # Check they're ordered by created_at DESC
-        self.assertEqual(user_a_messages[0]["message_id"], "msg_4")  # Most recent
-        self.assertEqual(user_a_messages[1]["message_id"], "msg_2")
-        self.assertEqual(user_a_messages[2]["message_id"], "msg_1")  # Oldest
+        self.assertEqual(user_a_messages[0]["message_id"], 4)  # Most recent
+        self.assertEqual(user_a_messages[1]["message_id"], 2)
+        self.assertEqual(user_a_messages[2]["message_id"], 1)  # Oldest
         
         # Test with limit
         limited_messages = self.messages_db.get_messages_by_user("user_a", limit=2)
         self.assertEqual(len(limited_messages), 2)
-        self.assertEqual(limited_messages[0]["message_id"], "msg_4")
+        self.assertEqual(limited_messages[0]["message_id"], 4)
 
     def test_get_all_messages(self):
         """Test retrieving all messages"""
         # Insert test messages
         messages = [
-            {"message_id": f"msg_{i}", "user_id": "user_1", "contents": f"Content {i}", 
+            {"message_id": i + 1, "user_id": "user_1", "contents": f"Content {i}", 
              "is_from_me": True, "created_at": f"2023-12-01T10:0{i}:00"}
             for i in range(5)
         ]
@@ -222,7 +222,7 @@ class TestMessagesTable(unittest.TestCase):
         """Test clearing all messages from the table"""
         # Insert test messages
         messages = [
-            {"message_id": f"msg_{i}", "user_id": "user_1", "contents": f"Content {i}",
+            {"message_id": i + 1, "user_id": "user_1", "contents": f"Content {i}",
              "is_from_me": True, "created_at": f"2023-12-01T10:0{i}:00"}
             for i in range(3)
         ]
@@ -251,7 +251,7 @@ class TestMessagesTable(unittest.TestCase):
         
         for i, case in enumerate(test_cases):
             message_data = {
-                "message_id": f"bool_test_{i}",
+                "message_id": 1000 + i,
                 "user_id": "test_user",
                 "contents": f"Boolean test {i}",
                 "is_from_me": case["is_from_me"],
@@ -261,7 +261,7 @@ class TestMessagesTable(unittest.TestCase):
             success = self.messages_db.insert_message(**message_data)
             self.assertTrue(success)
             
-            retrieved = self.messages_db.get_message_by_id(f"bool_test_{i}")
+            retrieved = self.messages_db.get_message_by_id(1000 + i)
             self.assertIsNotNone(retrieved)
             self.assertEqual(retrieved["is_from_me"], case["expected"])
             self.assertIsInstance(retrieved["is_from_me"], bool)
@@ -270,7 +270,7 @@ class TestMessagesTable(unittest.TestCase):
         """Test handling of empty and whitespace-only content"""
         # Empty content should be allowed (will be handled by validation layer)
         message_data = {
-            "message_id": "empty_test",
+            "message_id": 2000,
             "user_id": "test_user",
             "contents": "",
             "is_from_me": True,
@@ -280,7 +280,7 @@ class TestMessagesTable(unittest.TestCase):
         success = self.messages_db.insert_message(**message_data)
         self.assertTrue(success)
         
-        retrieved = self.messages_db.get_message_by_id("empty_test")
+        retrieved = self.messages_db.get_message_by_id(2000)
         self.assertIsNotNone(retrieved)
         self.assertEqual(retrieved["contents"], "")
 
@@ -290,7 +290,7 @@ class TestMessagesTable(unittest.TestCase):
         large_content = "A" * 10000
         
         message_data = {
-            "message_id": "large_test",
+            "message_id": 3000,
             "user_id": "test_user",
             "contents": large_content,
             "is_from_me": False,
@@ -300,7 +300,7 @@ class TestMessagesTable(unittest.TestCase):
         success = self.messages_db.insert_message(**message_data)
         self.assertTrue(success)
         
-        retrieved = self.messages_db.get_message_by_id("large_test")
+        retrieved = self.messages_db.get_message_by_id(3000)
         self.assertIsNotNone(retrieved)
         self.assertEqual(len(retrieved["contents"]), 10000)
         self.assertEqual(retrieved["contents"], large_content)
@@ -308,7 +308,7 @@ class TestMessagesTable(unittest.TestCase):
     def test_duplicate_message_id_handling(self):
         """Test handling of duplicate message IDs"""
         message_data = {
-            "message_id": "duplicate_test",
+            "message_id": 4000,
             "user_id": "test_user",
             "contents": "First message",
             "is_from_me": True,
@@ -325,7 +325,7 @@ class TestMessagesTable(unittest.TestCase):
         self.assertFalse(success2)
         
         # Verify original message is still there
-        retrieved = self.messages_db.get_message_by_id("duplicate_test")
+        retrieved = self.messages_db.get_message_by_id(4000)
         self.assertIsNotNone(retrieved)
         self.assertEqual(retrieved["contents"], "First message")
 

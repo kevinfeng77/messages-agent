@@ -69,11 +69,11 @@ class MessagesDatabase:
                 cursor.execute(
                     """
                     CREATE TABLE IF NOT EXISTS messages (
-                        message_id TEXT NOT NULL PRIMARY KEY,
+                        message_id INTEGER NOT NULL PRIMARY KEY,
                         user_id TEXT NOT NULL,
                         contents TEXT NOT NULL,
                         is_from_me BOOLEAN,
-                        created_at TEXT NOT NULL
+                        created_at TIMESTAMP NOT NULL
                     )
                 """
                 )
@@ -950,7 +950,7 @@ class MessagesDatabase:
 
     def insert_message(
         self,
-        message_id: str,
+        message_id: int,
         user_id: str,
         contents: str,
         is_from_me: bool,
@@ -960,7 +960,7 @@ class MessagesDatabase:
         Insert a single message into the messages table
 
         Args:
-            message_id: Unique identifier for the message
+            message_id: Unique numeric identifier for the message
             user_id: ID of the user who sent/received the message
             contents: Text content of the message
             is_from_me: Whether the message was sent by the user
@@ -994,7 +994,7 @@ class MessagesDatabase:
 
         Args:
             messages: List of message dictionaries with keys:
-                     message_id, user_id, contents, is_from_me, created_at
+                     message_id (int), user_id, contents, is_from_me, created_at
 
         Returns:
             Number of messages successfully inserted
@@ -1038,12 +1038,12 @@ class MessagesDatabase:
             logger.error(f"Error inserting messages batch: {e}")
             return 0
 
-    def get_message_by_id(self, message_id: str) -> Optional[Dict[str, Any]]:
+    def get_message_by_id(self, message_id: int) -> Optional[Dict[str, Any]]:
         """
         Get a message by its ID
 
         Args:
-            message_id: Message ID to search for
+            message_id: Numeric message ID to search for
 
         Returns:
             Message dictionary if found, None otherwise
