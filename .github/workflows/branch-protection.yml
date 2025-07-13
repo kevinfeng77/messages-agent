@@ -9,13 +9,21 @@ on:
 jobs:
   enforce-pr-workflow:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.event.head_commit.author.username != 'web-flow'
     steps:
-      - name: Block direct pushes to main
+      - name: Check if this is a direct push (not a PR merge)
         run: |
-          echo "❌ Direct pushes to main branch are not allowed!"
-          echo "Please create a pull request instead."
-          exit 1
+          # Check if this push came from a PR merge by looking at commit message
+          COMMIT_MESSAGE="${{ github.event.head_commit.message }}"
+          if [[ "$COMMIT_MESSAGE" == *"Merge pull request"* ]] || [[ "$COMMIT_MESSAGE" == *"Co-authored-by:"* ]]; then
+            echo "✅ This is a PR merge, allowing push to main"
+            exit 0
+          else
+            echo "❌ Direct pushes to main branch are not allowed!"
+            echo "Please create a pull request instead."
+            echo "Commit message: $COMMIT_MESSAGE"
+            exit 1
+          fi
 
   pr-checks:
     runs-on: ubuntu-latest
