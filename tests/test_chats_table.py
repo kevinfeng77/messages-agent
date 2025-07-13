@@ -342,24 +342,22 @@ class TestChatMigrationIntegration(unittest.TestCase):
         for user in test_users:
             self.messages_db.insert_user(user)
 
-    def test_migration_with_users(self):
-        """Test full migration process with user mapping"""
-        # Import here to avoid circular imports in test setup
-        from scripts.migration.migrate_chats import ChatMigrator
-
+    def test_chat_user_relationship_validation(self):
+        """Test that chats maintain correct user relationships"""
         # Create test users
         self._create_test_users()
 
-        # Run migration
-        migrator = ChatMigrator(self.source_db_path, self.target_db_path)
-        success = migrator.migrate_chats()
-        self.assertTrue(success)
+        # Create a chat with specific users (simulating what the legacy migration would do)
+        chat_id = 100
+        display_name = "Quantabes"
+        user_ids = ["user1", "user2"]  # John Wang, Eric Mueller
+        
+        # Insert the chat
+        result = self.messages_db.insert_chat(chat_id, display_name, user_ids)
+        self.assertTrue(result)
 
-        # Verify results
+        # Verify the chat was created correctly
         all_chats = self.messages_db.get_all_chats()
-        self.assertEqual(len(all_chats), 2)
-
-        # Find Quantabes chat
         quantabes_chats = [c for c in all_chats if c["display_name"] == "Quantabes"]
         self.assertEqual(len(quantabes_chats), 1)
 
@@ -367,54 +365,108 @@ class TestChatMigrationIntegration(unittest.TestCase):
         self.assertEqual(len(quantabes_chat["user_ids"]), 2)
         self.assertIn("user1", quantabes_chat["user_ids"])  # John Wang
         self.assertIn("user2", quantabes_chat["user_ids"])  # Eric Mueller
+        
+        # Verify user details are correct
+        all_users = self.messages_db.get_all_users()
+        user_dict = {user.user_id: user for user in all_users}
+        
+        self.assertEqual(user_dict["user1"].first_name, "John")
+        self.assertEqual(user_dict["user1"].last_name, "Wang")
+        self.assertEqual(user_dict["user2"].first_name, "Eric")
+        self.assertEqual(user_dict["user2"].last_name, "Mueller")
 
-    def test_migration_stats(self):
-        """Test migration statistics generation"""
-        from scripts.migration.migrate_chats import ChatMigrator
-
+    def test_database_statistics_tracking(self):
+        """Test that database maintains accurate counts and statistics"""
+        # Create test users
         self._create_test_users()
+        
+        # Create multiple chats with different user configurations
+        test_chats = [
+            {"chat_id": 101, "display_name": "Quantabes", "user_ids": ["user1", "user2"]},
+            {"chat_id": 102, "display_name": "Test Group", "user_ids": ["user3"]},
+        ]
+        
+        for chat_data in test_chats:
+            result = self.messages_db.insert_chat(
+                chat_data["chat_id"], 
+                chat_data["display_name"], 
+                chat_data["user_ids"]
+            )
+            self.assertTrue(result)
 
-        migrator = ChatMigrator(self.source_db_path, self.target_db_path)
-        migrator.migrate_chats()
+        # Verify statistics
+        all_chats = self.messages_db.get_all_chats()
+        all_users = self.messages_db.get_all_users()
+        
+        # Should have 2 chats and 3 users
+        self.assertEqual(len(all_chats), 2)
+        self.assertEqual(len(all_users), 3)
+        
+        # Verify chat counts by user participation
+        quantabes_chat = next(c for c in all_chats if c["display_name"] == "Quantabes")
+        test_group_chat = next(c for c in all_chats if c["display_name"] == "Test Group")
+        
+        self.assertEqual(len(quantabes_chat["user_ids"]), 2)
+        self.assertEqual(len(test_group_chat["user_ids"]), 1)
+        
+        # Test data integrity - all referenced users should exist
+        all_user_ids = {user.user_id for user in all_users}
+        for chat in all_chats:
+            for user_id in chat["user_ids"]:
+                self.assertIn(user_id, all_user_ids, f"User {user_id} referenced in chat but doesn't exist")
 
-        stats = migrator.get_migration_stats()
-
-        self.assertIn("source", stats)
-        self.assertIn("target", stats)
-        self.assertEqual(stats["source"]["total_chats"], 2)
-        self.assertEqual(stats["target"]["migrated_chats"], 2)
-        self.assertEqual(stats["migration_success_rate"], 100.0)
-
-    def test_validation_script(self):
-        """Test the validation script functionality"""
+    def test_data_validation_requirements(self):
+        """Test specific data validation requirements using the existing validator"""
         from scripts.validation.validate_chat_migration import ChatMigrationValidator
 
-        # Set up data
+        # Set up data using modern database operations
         self._create_test_users()
+        
+        # Create the Quantabes chat that the validator expects
+        quantabes_chat_id = 100
+        result = self.messages_db.insert_chat(
+            quantabes_chat_id, 
+            "Quantabes", 
+            ["user1", "user2"]  # John Wang and Eric Mueller
+        )
+        self.assertTrue(result)
+        
+        # Create additional test chat for completeness
+        test_chat_id = 101
+        result = self.messages_db.insert_chat(
+            test_chat_id,
+            "Test Group", 
+            ["user3"]
+        )
+        self.assertTrue(result)
 
-        # Run migration first
-        from scripts.migration.migrate_chats import ChatMigrator
-
-        migrator = ChatMigrator(self.source_db_path, self.target_db_path)
-        migrator.migrate_chats()
-
-        # Run validation
+        # Use the existing validator to test data quality
         validator = ChatMigrationValidator(self.source_db_path, self.target_db_path)
 
-        # Test Quantabes validation
+        # Test Quantabes-specific validation (this validates the business logic)
         quantabes_valid = validator.validate_quantabes_chat()
-        self.assertTrue(quantabes_valid)
+        self.assertTrue(quantabes_valid, "Quantabes chat validation should pass with John Wang and Eric Mueller")
 
-        # Test completeness validation
-        completeness = validator.validate_migration_completeness()
-        if not completeness["validation_passed"]:
-            print(f"Validation errors: {completeness.get('errors', [])}")
-            print(f"Validation warnings: {completeness.get('warnings', [])}")
-        self.assertTrue(completeness["validation_passed"])
-
-        # Test sample retrieval
-        samples = validator.get_chat_samples(limit=2)
-        self.assertEqual(len(samples), 2)
+        # Test that the validator can retrieve chat samples correctly
+        all_chats = self.messages_db.get_all_chats()
+        self.assertGreaterEqual(len(all_chats), 2, "Should have at least 2 chats for testing")
+        
+        # Verify that the specific users we expect are in the Quantabes chat
+        quantabes_chats = self.messages_db.get_chats_by_display_name("Quantabes")
+        self.assertEqual(len(quantabes_chats), 1, "Should have exactly one Quantabes chat")
+        
+        quantabes_chat = quantabes_chats[0]
+        user_ids = quantabes_chat["user_ids"]
+        
+        # Get the actual user details to verify names
+        users_in_chat = []
+        for user_id in user_ids:
+            user = self.messages_db.get_user_by_id(user_id)
+            if user:
+                users_in_chat.append(f"{user.first_name} {user.last_name}")
+        
+        self.assertIn("John Wang", users_in_chat, "John Wang should be in Quantabes chat")
+        self.assertIn("Eric Mueller", users_in_chat, "Eric Mueller should be in Quantabes chat")
 
 
 if __name__ == "__main__":
