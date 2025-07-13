@@ -10,7 +10,7 @@ import asyncio
 import logging
 import re
 import time
-from typing import Dict, List, Optional, Union, Any
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -231,7 +231,6 @@ class MessageService:
         recipient: str,
         content: str,
         retry_on_failure: bool = True,
-        **kwargs
     ) -> MessageResult:
         """
         Send a text message to a recipient.
@@ -240,7 +239,6 @@ class MessageService:
             recipient: Phone number (E.164 format) or email address
             content: Message content to send
             retry_on_failure: Whether to retry on failure
-            **kwargs: Additional message metadata (priority, etc.)
             
         Returns:
             MessageResult: Result of the send operation
