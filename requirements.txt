@@ -17,9 +17,8 @@ pytest>=7.0.0          # Testing framework
 pytest-cov>=4.0.0      # Coverage reporting
 pytest-xdist>=3.0.0    # Parallel test execution
 
-# Future AI integration (optional)
-# openai>=1.0.0         # OpenAI API
-# anthropic             # Anthropic API
+# AI integration
+anthropic>=0.32.0       # Anthropic API for Claude models
 
 # Optional enhancements
 # rich                  # Better console output
