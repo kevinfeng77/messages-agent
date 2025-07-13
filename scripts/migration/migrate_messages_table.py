@@ -139,8 +139,17 @@ class MessagesTableMigrator:
                     # Convert macOS timestamp to ISO format
                     # macOS uses seconds since 2001-01-01, convert to Unix timestamp
                     if date:
-                        unix_timestamp = date + 978307200  # Offset from 2001-01-01 to 1970-01-01
-                        created_at = datetime.fromtimestamp(unix_timestamp).isoformat()
+                        try:
+                            unix_timestamp = date + 978307200  # Offset from 2001-01-01 to 1970-01-01
+                            # Validate timestamp is reasonable (between 1970 and 2100)
+                            if 0 <= unix_timestamp <= 4102444800:  # 2100-01-01
+                                created_at = datetime.fromtimestamp(unix_timestamp).isoformat()
+                            else:
+                                # Use current time for invalid timestamps
+                                created_at = datetime.now().isoformat()
+                        except (OSError, ValueError, OverflowError):
+                            # Handle invalid timestamp values
+                            created_at = datetime.now().isoformat()
                     else:
                         created_at = datetime.now().isoformat()
 
