@@ -4,7 +4,7 @@
 import os
 import sqlite3
 import sys
-from datetime import datetime
+# from datetime import datetime  # unused
 from pathlib import Path
 
 # Add parent directory to path for imports
@@ -55,7 +55,7 @@ class DatabaseMigrator:
                 """
                 CREATE TABLE messages_with_contacts (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    
+
                     -- Message data
                     message_id INTEGER NOT NULL,
                     guid TEXT,
@@ -70,23 +70,23 @@ class DatabaseMigrator:
                     service TEXT,
                     account TEXT,
                     error INTEGER DEFAULT 0,
-                    
+
                     -- Handle/Contact data
                     handle_id INTEGER,
                     contact_id TEXT,
                     phone_email TEXT,
                     country TEXT,
                     service_type TEXT,
-                    
+
                     -- Contact information
                     contact_first_name TEXT,
                     contact_last_name TEXT,
                     contact_full_name TEXT,
-                    
+
                     -- Account mapping (for future use)
                     account_type TEXT,
                     account_display_name TEXT,
-                    
+
                     -- Metadata
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
@@ -128,11 +128,9 @@ class DatabaseMigrator:
         with sqlite3.connect(self.source_db_path) as source_conn:
             with sqlite3.connect(self.target_db_path) as target_conn:
                 source_cursor = source_conn.cursor()
-                target_cursor = target_conn.cursor()
-
                 # Build the query with optional limit
                 query = """
-                    SELECT 
+                    SELECT
                         m.ROWID as message_id,
                         m.guid,
                         m.text,
@@ -247,7 +245,7 @@ class DatabaseMigrator:
                     cursor.execute(
                         """
                         SELECT p.ZFULLNUMBER, r.ZFIRSTNAME, r.ZLASTNAME
-                        FROM ZABCDPHONENUMBER p 
+                        FROM ZABCDPHONENUMBER p
                         JOIN ZABCDRECORD r ON p.ZOWNER = r.Z_PK
                         WHERE p.ZFULLNUMBER IS NOT NULL
                     """
@@ -269,7 +267,7 @@ class DatabaseMigrator:
                     cursor.execute(
                         """
                         SELECT e.ZADDRESS, r.ZFIRSTNAME, r.ZLASTNAME
-                        FROM ZABCDEMAILADDRESS e 
+                        FROM ZABCDEMAILADDRESS e
                         JOIN ZABCDRECORD r ON e.ZOWNER = r.Z_PK
                         WHERE e.ZADDRESS IS NOT NULL
                     """
@@ -293,7 +291,9 @@ class DatabaseMigrator:
             except Exception as e:
                 logger.error(f"Error processing database {db_path}: {e}")
 
-        logger.info(f"Built contact lookup with {len(contact_lookup)} total entries")
+        logger.info(
+            "Built contact lookup with {} total entries".format(len(contact_lookup))
+        )
         return contact_lookup
 
     def _normalize_phone(self, phone):
@@ -353,8 +353,6 @@ class DatabaseMigrator:
             with sqlite3.connect(self.contacts_db_path) as contacts_conn:
                 with sqlite3.connect(self.target_db_path) as target_conn:
                     contacts_cursor = contacts_conn.cursor()
-                    target_cursor = target_conn.cursor()
-
                     # Get account information
                     contacts_cursor.execute(
                         """
@@ -419,17 +417,25 @@ def main():
         description="Migrate Messages database to joined format"
     )
     parser.add_argument(
-        "--source", default="./data/chat_copy.db", help="Source Messages database"
+        "--source",
+        default="./data/chat_copy.db",
+        help="Source Messages database",
     )
     parser.add_argument(
-        "--target", default="./data/messages_joined.db", help="Target database path"
+        "--target",
+        default="./data/messages_joined.db",
+        help="Target database path",
     )
     parser.add_argument(
-        "--limit", type=int, help="Limit number of messages to migrate (for testing)"
+        "--limit",
+        type=int,
+        help="Limit number of messages to migrate (for testing)",
     )
     parser.add_argument("--contacts", help="Path to contacts database")
     parser.add_argument(
-        "--stats-only", action="store_true", help="Show stats only, don't migrate"
+        "--stats-only",
+        action="store_true",
+        help="Show stats only, don't migrate",
     )
 
     args = parser.parse_args()

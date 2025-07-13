@@ -6,12 +6,9 @@ import shutil
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
-try:
-    from .message_decoder import MessageDecoder, extract_message_text
-except ImportError:
-    from message_decoder import MessageDecoder, extract_message_text
+from .message_decoder import MessageDecoder, extract_message_text
 
 logger = logging.getLogger(__name__)
 
@@ -169,7 +166,11 @@ class DatabaseManager:
 
     def cleanup_copies(self):
         """Remove all copied database files"""
-        for path in [self.copy_db_path, self.copy_wal_path, self.copy_shm_path]:
+        for path in [
+            self.copy_db_path,
+            self.copy_wal_path,
+            self.copy_shm_path,
+        ]:
             if path.exists():
                 path.unlink()
                 logger.info(f"Removed {path}")
@@ -196,7 +197,7 @@ class DatabaseManager:
 
             # Query messages with both text and attributedBody columns
             query = """
-                SELECT 
+                SELECT
                     ROWID,
                     guid,
                     text,
@@ -296,7 +297,7 @@ class DatabaseManager:
             # Get overall statistics
             cursor.execute(
                 """
-                SELECT 
+                SELECT
                     COUNT(*) as total_messages,
                     COUNT(CASE WHEN text IS NOT NULL AND text != '' THEN 1 END) as has_text,
                     COUNT(CASE WHEN text IS NULL OR text = '' THEN 1 END) as null_text,
@@ -312,9 +313,9 @@ class DatabaseManager:
             # Test decode a sample to estimate success rate
             cursor.execute(
                 """
-                SELECT attributedBody 
-                FROM message 
-                WHERE (text IS NULL OR text = '') AND attributedBody IS NOT NULL 
+                SELECT attributedBody
+                FROM message
+                WHERE (text IS NULL OR text = '') AND attributedBody IS NOT NULL
                 LIMIT 100
             """
             )

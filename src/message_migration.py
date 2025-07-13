@@ -7,10 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-try:
-    from .message_decoder import MessageDecoder, extract_message_text
-except ImportError:
-    from message_decoder import MessageDecoder, extract_message_text
+from .message_decoder import MessageDecoder, extract_message_text
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +71,7 @@ class MessageMigration:
             # Get overall statistics
             cursor.execute(
                 """
-                SELECT 
+                SELECT
                     COUNT(*) as total_messages,
                     COUNT(CASE WHEN text IS NOT NULL AND text != '' THEN 1 END) as has_text,
                     COUNT(CASE WHEN (text IS NULL OR text = '') AND attributedBody IS NOT NULL THEN 1 END) as needs_migration,
@@ -94,8 +91,8 @@ class MessageMigration:
             if has_extracted_column:
                 cursor.execute(
                     """
-                    SELECT COUNT(*) 
-                    FROM message 
+                    SELECT COUNT(*)
+                    FROM message
                     WHERE extracted_text IS NOT NULL AND extracted_text != ''
                 """
                 )
@@ -141,9 +138,9 @@ class MessageMigration:
             # Get messages that need migration
             cursor.execute(
                 """
-                SELECT ROWID, text, attributedBody 
-                FROM message 
-                WHERE (text IS NULL OR text = '') 
+                SELECT ROWID, text, attributedBody
+                FROM message
+                WHERE (text IS NULL OR text = '')
                 AND attributedBody IS NOT NULL
                 AND (extracted_text IS NULL OR extracted_text = '')
                 ORDER BY ROWID
@@ -199,7 +196,8 @@ class MessageMigration:
                 # Batch update extracted_text
                 if updates:
                     cursor.executemany(
-                        "UPDATE message SET extracted_text = ? WHERE ROWID = ?", updates
+                        "UPDATE message SET extracted_text = ? WHERE ROWID = ?",
+                        updates,
                     )
                     conn.commit()
 
@@ -241,16 +239,16 @@ class MessageMigration:
             # Check migration results
             cursor.execute(
                 """
-                SELECT 
+                SELECT
                     COUNT(*) as total_messages,
                     COUNT(CASE WHEN text IS NOT NULL AND text != '' THEN 1 END) as has_text,
                     COUNT(CASE WHEN extracted_text IS NOT NULL AND extracted_text != '' THEN 1 END) as has_extracted_text,
-                    COUNT(CASE WHEN 
-                        (text IS NULL OR text = '') AND 
-                        (extracted_text IS NOT NULL AND extracted_text != '') 
+                    COUNT(CASE WHEN
+                        (text IS NULL OR text = '') AND
+                        (extracted_text IS NOT NULL AND extracted_text != '')
                     THEN 1 END) as recovered_from_attributed_body,
-                    COUNT(CASE WHEN 
-                        (text IS NULL OR text = '') AND 
+                    COUNT(CASE WHEN
+                        (text IS NULL OR text = '') AND
                         (extracted_text IS NULL OR extracted_text = '') AND
                         attributedBody IS NOT NULL
                     THEN 1 END) as still_missing_text

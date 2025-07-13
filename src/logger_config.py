@@ -2,13 +2,15 @@
 
 import logging
 import logging.handlers
-import os
 from datetime import datetime
 from pathlib import Path
 
 
 def setup_logging(
-    log_level=logging.INFO, log_dir="logs", console_output=True, file_output=True
+    log_level=logging.INFO,
+    log_dir="logs",
+    console_output=True,
+    file_output=True,
 ):
     """
     Configure logging for the application
