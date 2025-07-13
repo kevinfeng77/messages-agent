@@ -4,7 +4,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Optional, Dict
 
-from src.utils.logger_config import get_logger
+from utils.logger_config import get_logger
 
 logger = get_logger(__name__)
 

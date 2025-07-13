@@ -4,8 +4,8 @@ import sqlite3
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 
-from src.user.user import User
-from src.utils.logger_config import get_logger
+from user.user import User
+from utils.logger_config import get_logger
 
 logger = get_logger(__name__)
 
@@ -65,6 +65,19 @@ class MessagesDatabase:
                 """
                 )
 
+                # Create messages table with simplified schema
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS messages (
+                        message_id TEXT NOT NULL PRIMARY KEY,
+                        user_id TEXT NOT NULL,
+                        contents TEXT NOT NULL,
+                        is_from_me BOOLEAN,
+                        created_at TEXT NOT NULL
+                    )
+                """
+                )
+
                 # Create indexes for performance
                 cursor.execute(
                     "CREATE INDEX IF NOT EXISTS idx_users_user_id ON users(user_id)"
@@ -90,10 +103,22 @@ class MessagesDatabase:
                 cursor.execute(
                     "CREATE INDEX IF NOT EXISTS idx_chat_users_user_id ON chat_users(user_id)"
                 )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_messages_message_id ON messages(message_id)"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_messages_user_id ON messages(user_id)"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at)"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_messages_is_from_me ON messages(is_from_me)"
+                )
 
                 conn.commit()
                 logger.info(
-                    f"Created messages database with users and chats tables at {self.db_path}"
+                    f"Created messages database with users, chats, and messages tables at {self.db_path}"
                 )
                 return True
 
@@ -922,3 +947,241 @@ class MessagesDatabase:
         except sqlite3.Error as e:
             logger.error(f"Error getting user details for chat {chat_id}: {e}")
             return []
+
+    def insert_message(
+        self,
+        message_id: str,
+        user_id: str,
+        contents: str,
+        is_from_me: bool,
+        created_at: str,
+    ) -> bool:
+        """
+        Insert a single message into the messages table
+
+        Args:
+            message_id: Unique identifier for the message
+            user_id: ID of the user who sent/received the message
+            contents: Text content of the message
+            is_from_me: Whether the message was sent by the user
+            created_at: Timestamp when the message was created (ISO format)
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+
+                cursor.execute(
+                    """
+                    INSERT INTO messages (message_id, user_id, contents, is_from_me, created_at)
+                    VALUES (?, ?, ?, ?, ?)
+                """,
+                    (message_id, user_id, contents, is_from_me, created_at),
+                )
+
+                conn.commit()
+                return True
+
+        except sqlite3.Error as e:
+            logger.error(f"Error inserting message {message_id}: {e}")
+            return False
+
+    def insert_messages_batch(self, messages: List[Dict[str, Any]]) -> int:
+        """
+        Insert multiple messages in a batch operation
+
+        Args:
+            messages: List of message dictionaries with keys:
+                     message_id, user_id, contents, is_from_me, created_at
+
+        Returns:
+            Number of messages successfully inserted
+        """
+        if not messages:
+            return 0
+
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+
+                # Prepare data for batch insert
+                message_data = [
+                    (
+                        msg["message_id"],
+                        msg["user_id"],
+                        msg["contents"],
+                        msg["is_from_me"],
+                        msg["created_at"],
+                    )
+                    for msg in messages
+                ]
+
+                cursor.executemany(
+                    """
+                    INSERT INTO messages (message_id, user_id, contents, is_from_me, created_at)
+                    VALUES (?, ?, ?, ?, ?)
+                """,
+                    message_data,
+                )
+
+                inserted_count = cursor.rowcount
+                conn.commit()
+
+                logger.info(
+                    f"Inserted {inserted_count} messages into messages database"
+                )
+                return inserted_count
+
+        except sqlite3.Error as e:
+            logger.error(f"Error inserting messages batch: {e}")
+            return 0
+
+    def get_message_by_id(self, message_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get a message by its ID
+
+        Args:
+            message_id: Message ID to search for
+
+        Returns:
+            Message dictionary if found, None otherwise
+        """
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+
+                cursor.execute(
+                    """
+                    SELECT message_id, user_id, contents, is_from_me, created_at
+                    FROM messages WHERE message_id = ?
+                """,
+                    (message_id,),
+                )
+
+                row = cursor.fetchone()
+                if row:
+                    message_id, user_id, contents, is_from_me, created_at = row
+                    return {
+                        "message_id": message_id,
+                        "user_id": user_id,
+                        "contents": contents,
+                        "is_from_me": bool(is_from_me),
+                        "created_at": created_at,
+                    }
+
+                return None
+
+        except sqlite3.Error as e:
+            logger.error(f"Error getting message {message_id}: {e}")
+            return None
+
+    def get_messages_by_user(
+        self, user_id: str, limit: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Get messages for a specific user
+
+        Args:
+            user_id: User ID to get messages for
+            limit: Optional limit on number of messages to return
+
+        Returns:
+            List of message dictionaries
+        """
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+
+                query = """
+                    SELECT message_id, user_id, contents, is_from_me, created_at
+                    FROM messages WHERE user_id = ?
+                    ORDER BY created_at DESC
+                """
+                if limit:
+                    query += f" LIMIT {limit}"
+
+                cursor.execute(query, (user_id,))
+
+                messages = []
+                for row in cursor.fetchall():
+                    message_id, user_id, contents, is_from_me, created_at = row
+                    messages.append(
+                        {
+                            "message_id": message_id,
+                            "user_id": user_id,
+                            "contents": contents,
+                            "is_from_me": bool(is_from_me),
+                            "created_at": created_at,
+                        }
+                    )
+
+                return messages
+
+        except sqlite3.Error as e:
+            logger.error(f"Error getting messages for user {user_id}: {e}")
+            return []
+
+    def get_all_messages(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Get all messages from the database
+
+        Args:
+            limit: Optional limit on number of messages to return
+
+        Returns:
+            List of message dictionaries
+        """
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+
+                query = """
+                    SELECT message_id, user_id, contents, is_from_me, created_at
+                    FROM messages
+                    ORDER BY created_at DESC
+                """
+                if limit:
+                    query += f" LIMIT {limit}"
+
+                cursor.execute(query)
+
+                messages = []
+                for row in cursor.fetchall():
+                    message_id, user_id, contents, is_from_me, created_at = row
+                    messages.append(
+                        {
+                            "message_id": message_id,
+                            "user_id": user_id,
+                            "contents": contents,
+                            "is_from_me": bool(is_from_me),
+                            "created_at": created_at,
+                        }
+                    )
+
+                return messages
+
+        except sqlite3.Error as e:
+            logger.error(f"Error getting all messages: {e}")
+            return []
+
+    def clear_messages_table(self) -> bool:
+        """
+        Clear all messages from the messages table
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM messages")
+                conn.commit()
+
+                logger.info("Cleared all messages from messages table")
+                return True
+
+        except sqlite3.Error as e:
+            logger.error(f"Error clearing messages table: {e}")
+            return False
