@@ -133,7 +133,7 @@ class TestLLMClient:
             client = LLMClient(api_key=self.api_key)
             
             response_text = '''{"response_1": "That's awesome!", "response_2": "Cool project"'''
-            with pytest.raises(ValueError, match="Invalid JSON response"):
+            with pytest.raises(ValueError, match="No JSON object found in response"):
                 client._parse_json_response(response_text)
     
     def test_parse_json_response_missing_fields(self):
@@ -196,12 +196,13 @@ class TestLLMClient:
     def test_generate_responses_api_error(self, mock_anthropic_class):
         """Test handling of Anthropic API errors."""
         mock_client = Mock()
-        mock_client.messages.create.side_effect = anthropic.APIError("API rate limit exceeded")
+        # Use a generic exception to test error handling
+        mock_client.messages.create.side_effect = Exception("API Error")
         mock_anthropic_class.return_value = mock_client
         
         client = LLMClient(api_key=self.api_key)
         
-        with pytest.raises(anthropic.APIError):
+        with pytest.raises(ValueError, match="Failed to generate responses"):
             client.generate_responses(self.sample_prompt_data)
     
     @patch('src.message_maker.llm_client.anthropic.Anthropic')
