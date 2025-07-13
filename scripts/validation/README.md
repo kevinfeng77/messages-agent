@@ -2,20 +2,9 @@
 
 This folder contains validation and testing scripts to verify the correctness and completeness of the Message Agent system implementation.
 
+**Note (SERENE-49)**: Some validation scripts have been removed as their functionality is now built into the streamlined setup process.
+
 ## Scripts
-
-### `validate_handle_id_implementation.py`
-Comprehensive validation of the handle_id feature (SERENE-47):
-- Validates specific test cases (Allison Shi, Wayne Ellerbe)
-- Tests phone number normalization
-- Verifies fallback user creation
-- Provides detailed reporting and statistics
-
-### `validate_implementation.py`
-General implementation validation:
-- Validates core system functionality
-- Tests data extraction and processing
-- Verifies database operations
 
 ### `validate_chat_migration.py`
 Validates the chat migration process and results:
@@ -30,23 +19,32 @@ Validates the messages database setup and integrity:
 - Validates data extraction from Messages database
 - Tests contact resolution and matching
 
+### `validate_messages_table.py`
+Validates messages table migration and content:
+- Verifies message extraction and text decoding
+- Tests message-chat relationships
+- Validates data integrity and completeness
+
 ## Usage
 
 Run validation scripts from the project root:
 
 ```bash
-# Validate chat migration results
+# Run all validations via just command
+just validate
+
+# Or run individual validation scripts
 python scripts/validation/validate_chat_migration.py
-
-# Validate handle_id implementation
-python scripts/validation/validate_handle_id_implementation.py
-
-# Validate general implementation
-python scripts/validation/validate_implementation.py
-
-# Validate messages database
 python scripts/validation/validate_messages_database.py
+python scripts/validation/validate_messages_table.py
 ```
+
+## Built-in Validation
+
+The streamlined setup process (`just setup`) includes built-in validation:
+- **Test Case Validation**: Automatically validates Allison Shi and Wayne Ellerbe test cases
+- **Statistical Reporting**: Provides success rates and coverage metrics
+- **Error Detection**: Reports any issues during setup process
 
 ## Output
 
@@ -58,7 +56,7 @@ All validation scripts provide:
 
 ## When to Use
 
-- **After Setup**: Run after initial system setup to verify everything works
-- **After Changes**: Validate after making code changes or updates
-- **Before Deployment**: Final validation before putting system into production
+- **After Setup**: Run `just validate` after `just setup` to verify everything works
+- **Development**: Use individual scripts to test specific components
 - **Troubleshooting**: Diagnose issues when system behavior is unexpected
+- **CI/CD**: Integrate validation into automated testing pipelines

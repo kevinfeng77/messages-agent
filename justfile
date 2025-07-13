@@ -64,34 +64,5 @@ format:
 # Show database statistics
 stats:
     @echo "📊 Database statistics:"
-    @python3 -c "
-import sqlite3
-from pathlib import Path
-
-for db_name, db_path in [('Chat Copy', './data/copy/chat_copy.db'), ('Messages', './data/messages.db')]:
-    if Path(db_path).exists():
-        print(f'\\n{db_name} Database ({db_path}):')
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        
-        if db_name == 'Chat Copy':
-            cursor.execute('SELECT COUNT(*) FROM message')
-            print(f'  Messages: {cursor.fetchone()[0]:,}')
-            cursor.execute('SELECT COUNT(*) FROM chat')  
-            print(f'  Chats: {cursor.fetchone()[0]:,}')
-            cursor.execute('SELECT COUNT(*) FROM handle')
-            print(f'  Handles: {cursor.fetchone()[0]:,}')
-        else:
-            tables = ['users', 'chats', 'messages', 'chat_users', 'chat_messages']
-            for table in tables:
-                try:
-                    cursor.execute(f'SELECT COUNT(*) FROM {table}')
-                    count = cursor.fetchone()[0]
-                    print(f'  {table.title()}: {count:,}')
-                except:
-                    print(f'  {table.title()}: N/A')
-        
-        conn.close()
-    else:
-        print(f'\\n{db_name} Database: Not found')
-"
+    @echo "Chat Copy Database:" && ([ -f "./data/copy/chat_copy.db" ] && echo "  Present" || echo "  Not found")
+    @echo "Messages Database:" && ([ -f "./data/messages.db" ] && echo "  Present" || echo "  Not found")
