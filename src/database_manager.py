@@ -5,8 +5,13 @@ import shutil
 import sqlite3
 import logging
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List, Dict, Any
 from datetime import datetime
+
+try:
+    from .message_decoder import extract_message_text, MessageDecoder
+except ImportError:
+    from message_decoder import extract_message_text, MessageDecoder
 
 logger = logging.getLogger(__name__)
 
@@ -166,3 +171,157 @@ class DatabaseManager:
             if path.exists():
                 path.unlink()
                 logger.info(f"Removed {path}")
+    
+    def extract_messages_with_text(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Extract messages with proper text extraction using fallback logic.
+        
+        Args:
+            limit: Maximum number of messages to extract (None for all)
+            
+        Returns:
+            List of message dictionaries with extracted text
+        """
+        if not self.copy_db_path.exists():
+            logger.error("Database copy does not exist")
+            return []
+        
+        try:
+            conn = sqlite3.connect(str(self.copy_db_path))
+            cursor = conn.cursor()
+            
+            # Query messages with both text and attributedBody columns
+            query = """
+                SELECT 
+                    ROWID,
+                    guid,
+                    text,
+                    attributedBody,
+                    handle_id,
+                    date,
+                    date_read,
+                    is_from_me,
+                    service
+                FROM message
+                ORDER BY date DESC
+            """
+            
+            if limit:
+                query += f" LIMIT {limit}"
+            
+            cursor.execute(query)
+            raw_messages = cursor.fetchall()
+            
+            conn.close()
+            
+            # Process messages with text extraction
+            messages = []
+            decoder = MessageDecoder()
+            
+            for row in raw_messages:
+                (rowid, guid, text, attributed_body, handle_id, 
+                 date, date_read, is_from_me, service) = row
+                
+                # Extract the best available text
+                extracted_text = extract_message_text(text, attributed_body)
+                
+                message = {
+                    "rowid": rowid,
+                    "guid": guid,
+                    "text": text,  # Original text column
+                    "extracted_text": extracted_text,  # Best extracted text
+                    "handle_id": handle_id,
+                    "date": date,
+                    "date_read": date_read,
+                    "is_from_me": bool(is_from_me),
+                    "service": service,
+                    "has_attributed_body": attributed_body is not None,
+                    "text_source": self._determine_text_source(text, attributed_body, extracted_text)
+                }
+                
+                messages.append(message)
+            
+            # Log extraction statistics
+            stats = decoder.get_decode_stats()
+            if stats["total_attempts"] > 0:
+                logger.info(f"Message extraction complete. Decoder stats: {stats}")
+            
+            return messages
+            
+        except sqlite3.Error as e:
+            logger.error(f"Error extracting messages: {e}")
+            return []
+    
+    def _determine_text_source(self, text: Optional[str], attributed_body: Optional[bytes], 
+                              extracted_text: Optional[str]) -> str:
+        """Determine the source of the extracted text for tracking purposes"""
+        if text and text.strip():
+            return "text_column"
+        elif extracted_text and attributed_body:
+            return "attributed_body_decoded"
+        elif attributed_body:
+            return "attributed_body_failed"
+        else:
+            return "no_text_available"
+    
+    def get_text_extraction_stats(self) -> Dict[str, Any]:
+        """Get statistics about text extraction across all messages"""
+        if not self.copy_db_path.exists():
+            logger.error("Database copy does not exist")
+            return {}
+        
+        try:
+            conn = sqlite3.connect(str(self.copy_db_path))
+            cursor = conn.cursor()
+            
+            # Get overall statistics
+            cursor.execute("""
+                SELECT 
+                    COUNT(*) as total_messages,
+                    COUNT(CASE WHEN text IS NOT NULL AND text != '' THEN 1 END) as has_text,
+                    COUNT(CASE WHEN text IS NULL OR text = '' THEN 1 END) as null_text,
+                    COUNT(CASE WHEN attributedBody IS NOT NULL THEN 1 END) as has_attributed_body,
+                    COUNT(CASE WHEN (text IS NULL OR text = '') AND attributedBody IS NOT NULL THEN 1 END) as needs_decoding
+                FROM message
+            """)
+            
+            stats = cursor.fetchone()
+            total, has_text, null_text, has_attributed_body, needs_decoding = stats
+            
+            # Test decode a sample to estimate success rate
+            cursor.execute("""
+                SELECT attributedBody 
+                FROM message 
+                WHERE (text IS NULL OR text = '') AND attributedBody IS NOT NULL 
+                LIMIT 100
+            """)
+            
+            sample_attributed_bodies = cursor.fetchall()
+            
+            decoder = MessageDecoder()
+            successful_decodes = 0
+            
+            for (attributed_body,) in sample_attributed_bodies:
+                if decoder.decode_attributed_body(attributed_body):
+                    successful_decodes += 1
+            
+            decode_stats = decoder.get_decode_stats()
+            estimated_success_rate = decode_stats.get("success_rate_percent", 0)
+            
+            conn.close()
+            
+            return {
+                "total_messages": total,
+                "has_text_column": has_text,
+                "null_text_column": null_text,
+                "has_attributed_body": has_attributed_body,
+                "needs_decoding": needs_decoding,
+                "text_coverage_percent": round((has_text / total) * 100, 2) if total > 0 else 0,
+                "attributed_body_coverage_percent": round((has_attributed_body / total) * 100, 2) if total > 0 else 0,
+                "sample_decode_success_rate": estimated_success_rate,
+                "estimated_recoverable_messages": round((needs_decoding * estimated_success_rate / 100), 0)
+            }
+            
+        except sqlite3.Error as e:
+            logger.error(f"Error getting extraction stats: {e}")
+            return {}
