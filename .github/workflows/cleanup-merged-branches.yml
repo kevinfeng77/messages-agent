@@ -20,7 +20,11 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PAT_BRANCH_DELETE }}
+
+      - name: Set up PAT for pushing
+        run: |
+          git remote set-url origin https://x-access-token:${{ secrets.PAT_BRANCH_DELETE }}@github.com/kevinfeng77/messages-agent.git
       
       - name: Delete merged branch (PR event)
         if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
