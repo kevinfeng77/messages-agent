@@ -136,6 +136,154 @@ def process_handles(
     return stats
 
 
+def generate_chat_display_name(chat_id: int, messages_db: MessagesDatabase, chat_db_path: str) -> str:
+    """
+    Generate a sophisticated display name for a chat following the fallback order:
+    1. If there are users: "First Last" (single user) or "First Last, First Last, ..." (multiple users)
+    2. If no matched users, use phone number or email from handle
+    3. If no handle info, use handle.id from original table
+    4. Fall back to "Chat {chat_id}"
+    
+    Args:
+        chat_id: Chat ID to generate name for
+        messages_db: MessagesDatabase instance for user lookups
+        chat_db_path: Path to the Messages database copy
+        
+    Returns:
+        Generated display name string
+    """
+    try:
+        # Get handle information for this chat
+        with sqlite3.connect(str(chat_db_path)) as conn:
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                SELECT chj.handle_id, h.id as handle_identifier
+                FROM chat_handle_join chj
+                JOIN handle h ON chj.handle_id = h.ROWID
+                WHERE chj.chat_id = ?
+                ORDER BY chj.handle_id
+            """, (chat_id,))
+            
+            chat_handles = cursor.fetchall()
+        
+        if not chat_handles:
+            return f"Chat {chat_id}"
+        
+        # Try to get user names first
+        user_names = []
+        unmatched_handles = []
+        
+        for handle_id, handle_identifier in chat_handles:
+            # Get user by handle_id
+            user = messages_db.get_user_by_handle_id(handle_id)
+            if user and user.first_name and user.last_name:
+                full_name = f"{user.first_name} {user.last_name}".strip()
+                if full_name and full_name != " ":
+                    user_names.append(full_name)
+                    continue
+            elif user:
+                # Try phone or email if no names
+                if user.phone_number and user.phone_number.strip():
+                    user_names.append(user.phone_number.strip())
+                    continue
+                elif user.email and user.email.strip():
+                    user_names.append(user.email.strip())
+                    continue
+            
+            # If we get here, no user match or no useful user data
+            unmatched_handles.append(handle_identifier)
+        
+        # Build display name based on what we found
+        display_parts = []
+        
+        # Add user names first
+        if user_names:
+            display_parts.extend(user_names[:3])  # Limit to first 3 to avoid very long names
+        
+        # Add unmatched handle identifiers
+        if unmatched_handles and len(display_parts) < 3:
+            remaining_slots = 3 - len(display_parts)
+            display_parts.extend(unmatched_handles[:remaining_slots])
+        
+        if display_parts:
+            display_name = ", ".join(display_parts)
+            # Add "..." if there are more participants than we're showing
+            if len(chat_handles) > len(display_parts):
+                display_name += "..."
+            return display_name
+        else:
+            return f"Chat {chat_id}"
+            
+    except Exception as e:
+        logger.warning(f"Error generating display name for chat {chat_id}: {e}")
+        return f"Chat {chat_id}"
+
+
+def enhance_chat_display_names(messages_db: MessagesDatabase, chat_db_path: str) -> Dict[str, int]:
+    """
+    Enhance chat display names with sophisticated fallback logic
+    
+    Args:
+        messages_db: MessagesDatabase instance
+        chat_db_path: Path to the Messages database copy
+        
+    Returns:
+        Dictionary with enhancement statistics
+    """
+    logger.info("Starting chat display name enhancement...")
+    
+    try:
+        # Get all chats that need display name enhancement
+        all_chats = messages_db.get_all_chats()
+        chats_to_update = []
+        
+        for chat in all_chats:
+            current_name = chat.get("display_name", "")
+            # Check if display name is empty, None, or the basic fallback pattern
+            if not current_name or current_name.startswith("Chat ") or current_name.strip() == "":
+                chats_to_update.append((chat["chat_id"], current_name))
+        
+        logger.info(f"Found {len(chats_to_update)} chats needing display name enhancement")
+        
+        chats_updated = 0
+        chats_skipped = 0
+        
+        for chat_id, current_display_name in chats_to_update:
+            try:
+                new_display_name = generate_chat_display_name(chat_id, messages_db, chat_db_path)
+                
+                # Only update if the new name is different and better than default
+                if new_display_name != current_display_name and not new_display_name.startswith("Chat "):
+                    with sqlite3.connect(str(messages_db.db_path)) as conn:
+                        cursor = conn.cursor()
+                        cursor.execute(
+                            "UPDATE chats SET display_name = ? WHERE chat_id = ?",
+                            (new_display_name, chat_id)
+                        )
+                        conn.commit()
+                    chats_updated += 1
+                    logger.debug(f"Updated chat {chat_id}: '{current_display_name}' -> '{new_display_name}'")
+                else:
+                    chats_skipped += 1
+                    
+            except Exception as e:
+                logger.warning(f"Error enhancing display name for chat {chat_id}: {e}")
+                chats_skipped += 1
+        
+        logger.info(f"Display name enhancement completed: {chats_updated} updated, {chats_skipped} skipped")
+        
+        return {
+            "chats_checked": len(chats_to_update),
+            "chats_updated": chats_updated,
+            "chats_skipped": chats_skipped
+        }
+        
+    except Exception as e:
+        logger.error(f"Error during chat display name enhancement: {e}")
+        return {"error": str(e)}
+
+
 def populate_chat_users_relationships(messages_db: MessagesDatabase, chat_db_path: str) -> Dict[str, int]:
     """
     Populate chat_users relationships from the Messages database
@@ -486,8 +634,25 @@ def main():
     print(f"   - Chats with users: {chats_with_users}")
     print(f"   - Chats without users: {chats_without_users}")
     
+    # Enhance chat display names with sophisticated fallback logic
+    print("\n7. Enhancing chat display names...")
+    enhancement_stats = enhance_chat_display_names(messages_db, chat_db_path)
+    
+    if "error" in enhancement_stats:
+        print(f"❌ Chat display name enhancement failed: {enhancement_stats['error']}")
+        return False
+    
+    chats_checked = enhancement_stats.get("chats_checked", 0)
+    chats_updated = enhancement_stats.get("chats_updated", 0)
+    chats_skipped = enhancement_stats.get("chats_skipped", 0)
+    
+    print(f"✅ Chat display name enhancement completed:")
+    print(f"   - Chats checked: {chats_checked}")
+    print(f"   - Display names updated: {chats_updated}")
+    print(f"   - Chats skipped: {chats_skipped}")
+    
     # Validate test cases
-    print("\n7. Validating test cases...")
+    print("\n8. Validating test cases...")
     validation = validate_test_cases(messages_db)
     
     allison_pass = validation.get("allison_shi_handle_3", False)
@@ -497,7 +662,7 @@ def main():
     print(f"   - Wayne Ellerbe test case: {'✅ PASS' if wayne_pass else '❌ FAIL'}")
     
     # Final database statistics
-    print("\n8. Final database statistics:")
+    print("\n9. Final database statistics:")
     db_stats = messages_db.get_database_stats()
     
     # Calculate handle-specific stats
@@ -516,6 +681,7 @@ def main():
     print(f"   - Users Without Handle Id: {users_without_handle_id}")
     print(f"   - Messages In Table: {messages_migrated}")
     print(f"   - Chat-User Relationships: {relationships_created}")
+    print(f"   - Display Names Enhanced: {chats_updated}")
     
     # Success summary
     all_critical_passed = allison_pass and wayne_pass
@@ -531,6 +697,7 @@ def main():
     print(f"   Total messages: {messages_migrated}")
     print(f"   Total chats: {chats_migrated}")
     print(f"   Chat-user relationships: {relationships_created}")
+    print(f"   Display names enhanced: {chats_updated}")  
     print(f"   Handle processing success rate: {success_rate:.1f}%")
     print(f"   Messages migration coverage: {coverage:.1f}%")
     print(f"   Test cases: {'✅ All passed' if all_critical_passed else '⚠️ Some failed'}")
