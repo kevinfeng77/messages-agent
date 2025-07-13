@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.database.messages_db import MessagesDatabase
-from src.user.user import AddressBookExtractor
+from src.extractors.addressbook_extractor import AddressBookExtractor
 from src.utils.logger_config import get_logger
 
 logger = get_logger(__name__)

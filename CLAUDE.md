@@ -26,8 +26,9 @@ When you receive a Linear ticket link or ID:
 ## Auto-Plan Generation Protocol
 
 1. **Fetch Ticket Details**
-   - Use `mcp__linear__get_issue` to retrieve full ticket information
+   - Use `mcp__linear__get_issue` with the ticket ID (e.g., "SERENE-46")
    - Extract: title, description, estimate, priority, project context
+   - Example: `mcp__linear__get_issue(id="SERENE-46")`
 
 2. **Analyze Technical Context**
    - Identify which phase/component this task belongs to
