@@ -17,9 +17,9 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from message_maker.api import generate_message_responses
-from message_maker.types import MessageRequest
-from database.messages_db import MessagesDatabase
+from src.message_maker.api import generate_message_responses
+from src.message_maker.types import MessageRequest
+from src.database.messages_db import MessagesDatabase
 
 
 def find_chat_by_display_name(display_name: str) -> tuple[int, str]:
