@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Any
 
 # Add src to path so we can import our modules
-sys.path.append(str(Path(__file__).parent.parent))
+sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from src.database.manager import DatabaseManager
 from src.database.messages_db import MessagesDatabase
