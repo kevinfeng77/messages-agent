@@ -96,8 +96,58 @@ def run_single_poll(data_dir: str, batch_size: int) -> bool:
         return False
 
 
+def format_message_content(content: str, max_length: int = 80) -> str:
+    """Format message content for display"""
+    if not content:
+        return "[No text content]"
+    
+    content = content.strip()
+    if len(content) > max_length:
+        content = content[:max_length-3] + "..."
+    
+    return content
+
+
+def on_new_messages_callback(new_messages, synced_count):
+    """Callback for new message notifications"""
+    from datetime import datetime
+    
+    print(f"\n🚨 NEW MESSAGES! ({len(new_messages)} found, {synced_count} synced)")
+    print("=" * 50)
+    
+    # Show details for first few messages
+    for i, msg in enumerate(new_messages[:3], 1):
+        try:
+            content = msg.get("extracted_text") or msg.get("text") or "[No content]"
+            formatted_content = format_message_content(content)
+            
+            # Convert timestamp
+            try:
+                apple_timestamp = msg.get("date", 0)
+                apple_epoch = datetime(2001, 1, 1)
+                timestamp_seconds = apple_timestamp / 1_000_000_000
+                message_time = apple_epoch.timestamp() + timestamp_seconds
+                time_str = datetime.fromtimestamp(message_time).strftime("%I:%M:%S %p")
+            except:
+                time_str = "Unknown time"
+            
+            sender = "📤 You" if msg.get("is_from_me") else f"📥 Handle {msg.get('handle_id', 'Unknown')}"
+            
+            print(f"  {i}. {sender} at {time_str}")
+            print(f"     💬 {formatted_content}")
+            print(f"     🆔 ROWID: {msg.get('rowid', 'N/A')}")
+            
+        except Exception as e:
+            print(f"  {i}. Error displaying message: {e}")
+    
+    if len(new_messages) > 3:
+        print(f"  ... and {len(new_messages) - 3} more messages")
+    
+    print("=" * 50)
+
+
 def run_continuous_polling(data_dir: str, poll_interval: int, batch_size: int):
-    """Run continuous polling with status updates"""
+    """Run continuous polling with status updates and new message notifications"""
     print(f"Starting continuous polling (interval: {poll_interval}s, batch_size: {batch_size})")
     
     try:
@@ -113,9 +163,16 @@ def run_continuous_polling(data_dir: str, poll_interval: int, batch_size: int):
             return
         
         print("✅ Polling service initialized")
+        
+        # Set up new message notification callback
+        polling_service.set_new_message_callback(on_new_messages_callback)
+        print("🔔 New message notifications enabled")
+        
         print_status(polling_service)
         
-        print(f"\nStarting continuous polling... (Press Ctrl+C to stop)")
+        print(f"\n🚀 Starting continuous polling...")
+        print(f"📱 You'll be notified when new iMessages arrive!")
+        print(f"   Press Ctrl+C to stop\n")
         
         # Set up signal handlers
         signal.signal(signal.SIGINT, signal_handler)
@@ -131,9 +188,9 @@ def run_continuous_polling(data_dir: str, poll_interval: int, batch_size: int):
             while polling_service.is_running:
                 time.sleep(1)
                 
-                # Print status every 30 seconds
+                # Print status every 60 seconds (less frequent since we have message notifications)
                 current_time = time.time()
-                if current_time - last_status_time >= 30:
+                if current_time - last_status_time >= 60:
                     status = polling_service.get_status()
                     state = status.get("polling_state", {})
                     print(f"\n📊 Status Update (Poll #{poll_count}):")
@@ -221,8 +278,8 @@ Examples:
     parser.add_argument(
         "--interval",
         type=int,
-        default=5,
-        help="Polling interval in seconds (default: 5)"
+        default=1,
+        help="Polling interval in seconds (default: 1 for fast polling)"
     )
     
     parser.add_argument(

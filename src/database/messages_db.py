@@ -77,6 +77,27 @@ class MessagesDatabase:
                     )
                 """
                 )
+                
+                # COMPATIBILITY: Create 'message' table alias for polling service
+                # The polling service expects 'message' (singular) but we use 'messages' (plural)
+                cursor.execute(
+                    """
+                    CREATE VIEW IF NOT EXISTS message AS 
+                    SELECT 
+                        message_id as ROWID,
+                        message_id,
+                        user_id,
+                        contents as text,
+                        NULL as attributedBody,
+                        0 as handle_id,
+                        created_at as date,
+                        NULL as date_read,
+                        is_from_me,
+                        'iMessage' as service,
+                        NULL as guid
+                    FROM messages
+                """
+                )
 
                 # Create chat_messages junction table (from chat_message_join)
                 cursor.execute(

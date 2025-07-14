@@ -42,6 +42,7 @@ class MessagePollingService:
         # Runtime state
         self.is_running = False
         self.last_error = None
+        self.on_new_messages = None  # Callback for new message notifications
 
     def initialize(self) -> bool:
         """
@@ -67,6 +68,7 @@ class MessagePollingService:
         except Exception as e:
             logger.error(f"Error initializing polling service: {e}")
             return False
+
 
     def get_new_messages_from_source(
         self, last_processed_rowid: int
@@ -337,6 +339,13 @@ class MessagePollingService:
             logger.info(
                 f"Polling cycle complete: {len(new_messages)} new, {synced_count} synced in {duration:.2f}s"
             )
+            
+            # Trigger notification callback if new messages were found
+            if new_messages and hasattr(self, 'on_new_messages') and self.on_new_messages:
+                try:
+                    self.on_new_messages(new_messages, synced_count)
+                except Exception as e:
+                    logger.error(f"Error in new message callback: {e}")
 
             return {
                 "success": True,
@@ -402,6 +411,16 @@ class MessagePollingService:
             self.is_running = False
         else:
             logger.info("Polling service is not running")
+
+    def set_new_message_callback(self, callback):
+        """
+        Set callback function to be called when new messages are found
+        
+        Args:
+            callback: Function that takes (new_messages, synced_count) as parameters
+        """
+        self.on_new_messages = callback
+        logger.info("New message notification callback set")
 
     def get_status(self) -> Dict[str, Any]:
         """
