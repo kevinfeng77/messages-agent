@@ -92,6 +92,21 @@ class MessagesDatabase:
                 """
                 )
 
+                # Create polling_state table for sync tracking
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS polling_state (
+                        id INTEGER PRIMARY KEY CHECK (id = 1),
+                        last_processed_rowid INTEGER NOT NULL DEFAULT 0,
+                        last_sync_timestamp TEXT NOT NULL,
+                        total_messages_processed INTEGER NOT NULL DEFAULT 0,
+                        sync_status TEXT NOT NULL DEFAULT 'idle',
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                    """
+                )
+
                 # Create indexes for performance
                 cursor.execute(
                     "CREATE INDEX IF NOT EXISTS idx_users_user_id ON users(user_id)"
@@ -137,6 +152,9 @@ class MessagesDatabase:
                 )
                 cursor.execute(
                     "CREATE INDEX IF NOT EXISTS idx_chat_messages_message_date ON chat_messages(message_date)"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_polling_state_last_sync ON polling_state(last_sync_timestamp)"
                 )
 
                 conn.commit()
@@ -1322,7 +1340,14 @@ class MessagesDatabase:
 
                 messages = []
                 for row in cursor.fetchall():
-                    message_id, user_id, contents, is_from_me, created_at, message_date = row
+                    (
+                        message_id,
+                        user_id,
+                        contents,
+                        is_from_me,
+                        created_at,
+                        message_date,
+                    ) = row
                     messages.append(
                         {
                             "message_id": message_id,
@@ -1401,4 +1426,220 @@ class MessagesDatabase:
 
         except sqlite3.Error as e:
             logger.error(f"Error clearing chat_messages table: {e}")
+            return False
+
+    def create_polling_state_table(self) -> bool:
+        """
+        Create the polling_state table to track sync progress
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+
+                # Create polling_state table
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS polling_state (
+                        id INTEGER PRIMARY KEY CHECK (id = 1),
+                        last_processed_rowid INTEGER NOT NULL DEFAULT 0,
+                        last_sync_timestamp TEXT NOT NULL,
+                        total_messages_processed INTEGER NOT NULL DEFAULT 0,
+                        sync_status TEXT NOT NULL DEFAULT 'idle',
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                    """
+                )
+
+                # Create index for performance
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_polling_state_last_sync ON polling_state(last_sync_timestamp)"
+                )
+
+                conn.commit()
+                logger.info("Created polling_state table for sync tracking")
+                return True
+
+        except sqlite3.Error as e:
+            logger.error(f"Error creating polling_state table: {e}")
+            return False
+
+    def initialize_polling_state(self) -> bool:
+        """
+        Initialize the polling state if it doesn't exist
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+
+                # Check if polling state already exists
+                cursor.execute("SELECT COUNT(*) FROM polling_state WHERE id = 1")
+                if cursor.fetchone()[0] > 0:
+                    logger.info("Polling state already initialized")
+                    return True
+
+                # Initialize with timestamp
+                from datetime import datetime
+
+                current_time = datetime.now().isoformat()
+
+                cursor.execute(
+                    """
+                    INSERT INTO polling_state 
+                    (id, last_processed_rowid, last_sync_timestamp, total_messages_processed, 
+                     sync_status, created_at, updated_at)
+                    VALUES (1, 0, ?, 0, 'initialized', ?, ?)
+                    """,
+                    (current_time, current_time, current_time),
+                )
+
+                conn.commit()
+                logger.info("Initialized polling state")
+                return True
+
+        except sqlite3.Error as e:
+            logger.error(f"Error initializing polling state: {e}")
+            return False
+
+    def get_polling_state(self) -> Optional[Dict[str, Any]]:
+        """
+        Get the current polling state
+
+        Returns:
+            Dictionary with polling state or None if error
+        """
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+
+                cursor.execute(
+                    """
+                    SELECT last_processed_rowid, last_sync_timestamp, total_messages_processed,
+                           sync_status, created_at, updated_at
+                    FROM polling_state WHERE id = 1
+                    """
+                )
+
+                row = cursor.fetchone()
+                if row:
+                    (
+                        last_processed_rowid,
+                        last_sync_timestamp,
+                        total_messages_processed,
+                        sync_status,
+                        created_at,
+                        updated_at,
+                    ) = row
+                    return {
+                        "last_processed_rowid": last_processed_rowid,
+                        "last_sync_timestamp": last_sync_timestamp,
+                        "total_messages_processed": total_messages_processed,
+                        "sync_status": sync_status,
+                        "created_at": created_at,
+                        "updated_at": updated_at,
+                    }
+
+                return None
+
+        except sqlite3.Error as e:
+            logger.error(f"Error getting polling state: {e}")
+            return None
+
+    def update_polling_state(
+        self,
+        last_processed_rowid: int,
+        messages_processed_count: int = 0,
+        sync_status: str = "idle",
+    ) -> bool:
+        """
+        Update the polling state with new sync information
+
+        Args:
+            last_processed_rowid: Latest ROWID that was processed
+            messages_processed_count: Number of new messages processed in this sync
+            sync_status: Current sync status ('idle', 'polling', 'syncing', 'error')
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+
+                from datetime import datetime
+
+                current_time = datetime.now().isoformat()
+
+                cursor.execute(
+                    """
+                    UPDATE polling_state SET
+                        last_processed_rowid = ?,
+                        last_sync_timestamp = ?,
+                        total_messages_processed = total_messages_processed + ?,
+                        sync_status = ?,
+                        updated_at = ?
+                    WHERE id = 1
+                    """,
+                    (
+                        last_processed_rowid,
+                        current_time,
+                        messages_processed_count,
+                        sync_status,
+                        current_time,
+                    ),
+                )
+
+                if cursor.rowcount > 0:
+                    conn.commit()
+                    logger.info(
+                        f"Updated polling state: ROWID={last_processed_rowid}, processed={messages_processed_count}, status={sync_status}"
+                    )
+                    return True
+                else:
+                    logger.error("No polling state record found to update")
+                    return False
+
+        except sqlite3.Error as e:
+            logger.error(f"Error updating polling state: {e}")
+            return False
+
+    def set_sync_status(self, status: str) -> bool:
+        """
+        Update only the sync status
+
+        Args:
+            status: New sync status ('idle', 'polling', 'syncing', 'error')
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+
+                from datetime import datetime
+
+                current_time = datetime.now().isoformat()
+
+                cursor.execute(
+                    """
+                    UPDATE polling_state SET
+                        sync_status = ?,
+                        updated_at = ?
+                    WHERE id = 1
+                    """,
+                    (status, current_time),
+                )
+
+                conn.commit()
+                return cursor.rowcount > 0
+
+        except sqlite3.Error as e:
+            logger.error(f"Error setting sync status: {e}")
             return False
