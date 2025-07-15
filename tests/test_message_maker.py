@@ -23,7 +23,7 @@ except ImportError:
     pass
 
 # Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from src.message_maker.api import generate_message_responses
 from src.message_maker.types import MessageRequest

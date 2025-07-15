@@ -15,7 +15,7 @@ from typing import List, Dict, Any
 import sys
 
 # Add src to path for imports
-sys.path.append(str(Path(__file__).parent.parent.parent / "src"))
+sys.path.append(str(Path(__file__).parent.parent / "src"))
 
 from database.messages_db import MessagesDatabase
 
