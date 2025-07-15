@@ -167,6 +167,11 @@ class TestMessageDecoderIntegration(unittest.TestCase):
         conn = sqlite3.connect(str(self.db_path))
         cursor = conn.cursor()
 
+        # Check if message table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='message'")
+        if not cursor.fetchone():
+            self.skipTest("Message table not available for testing")
+
         # Get some real samples
         cursor.execute(
             """
@@ -203,6 +208,11 @@ class TestMessageDecoderIntegration(unittest.TestCase):
 
         conn = sqlite3.connect(str(self.db_path))
         cursor = conn.cursor()
+
+        # Check if message table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='message'")
+        if not cursor.fetchone():
+            self.skipTest("Message table not available for testing")
 
         # Get statistics
         cursor.execute(
