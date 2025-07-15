@@ -3,9 +3,13 @@
 
 import sys
 import time
-sys.path.insert(0, 'src')
-from src.utils.load_env import load_env
-load_env()
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'src'))
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 from src.message_maker.chat_history import get_chat_history_for_message_generation
 from src.message_maker.api import MessageMakerService
