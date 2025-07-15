@@ -34,7 +34,7 @@ If git worktrees are not available, fall back to standard branching:
 
 2. **Create new feature branch from latest main:**
    ```bash
-   git checkout -b kevin/{description-of-changes}
+   git checkout -b ${USER}/{description-of-changes}
    ```
 
 3. **List and manage worktrees:**
@@ -56,9 +56,9 @@ If git worktrees are not available, fall back to standard branching:
 - `worktrees/pr-review`
 
 **Example branch names:**
-- `kevin/message-maker-structure-fix`
-- `kevin/person-entity-schema`
-- `kevin/neo4j-setup`
+- `${USER}/message-maker-structure-fix`
+- `${USER}/person-entity-schema`
+- `${USER}/neo4j-setup`
 
 **NEVER work directly on main or existing branches for new tickets - this step is NON-NEGOTIABLE.**
 
@@ -142,9 +142,9 @@ When you receive a Linear ticket link or ID:
 
 6. **Create Feature Branch**
    - ALWAYS create a new branch for each Linear ticket
-   - Use naming convention: `kevin/{ticket-description}`
+   - Use naming convention: `${USER}/{ticket-description}`
    - Branch from main/master before starting implementation
-   - Example: `git checkout -b kevin/refactor-directory-tree`
+   - Example: `git checkout -b ${USER}/refactor-directory-tree`
 
 7. **Await Confirmation**
    - Present plan for review
@@ -274,13 +274,13 @@ tests/
 ## Git Workflow & Branch Management
 
 ### Branch Naming Convention
-All branches should follow the pattern: `kevin/{description-of-changes-in-few-words}`
+All branches should follow the pattern: `${USER}/{description-of-changes-in-few-words}`
 
 **Examples:**
-- `kevin/person-entity-schema`
-- `kevin/neo4j-setup`
-- `kevin/message-validation`
-- `kevin/response-generation-api`
+- `${USER}/person-entity-schema`
+- `${USER}/neo4j-setup`
+- `${USER}/message-validation`
+- `${USER}/response-generation-api`
 
 ### Pull Request Guidelines
 
@@ -299,7 +299,7 @@ All branches should follow the pattern: `kevin/{description-of-changes-in-few-wo
    git pull origin main
    
    # Create new feature branch from latest main
-   git checkout -b kevin/{short-description}
+   git checkout -b ${USER}/{short-description}
    ```
 
 2. **Implement Changes**
@@ -384,19 +384,19 @@ git checkout main
 git pull origin main
 
 # Create and switch to feature branch from latest main
-git checkout -b kevin/{description}
+git checkout -b ${USER}/{description}
 
 # Add and commit changes
 git add .
 git commit -m "Implement [feature description]"
 
 # Push branch (PR creation handled by MCP)
-git push -u origin kevin/{description}
+git push -u origin ${USER}/{description}
 
 # After PR approval, clean up
 git checkout main
 git pull origin main
-git branch -d kevin/{description}
+git branch -d ${USER}/{description}
 ```
 
 ### Git Worktrees for Parallel Development
@@ -418,10 +418,10 @@ git worktree list
 git worktree add worktrees/feature-name feature-branch-name
 
 # Add worktree and create new branch (CORRECTED - use subdirectories)
-git worktree add -b kevin/new-feature worktrees/new-feature
+git worktree add -b ${USER}/new-feature worktrees/new-feature
 
 # Add worktree for hotfix from main (CORRECTED - use subdirectories)
-git worktree add -b kevin/hotfix-urgent worktrees/hotfix-urgent main
+git worktree add -b ${USER}/hotfix-urgent worktrees/hotfix-urgent main
 
 # Remove completed worktree (CORRECTED - use subdirectories)
 git worktree remove worktrees/feature-name
@@ -470,10 +470,10 @@ cd worktrees/feature-name
 git cherry-pick <commit-hash-from-other-worktree>
 
 # Create experimental worktree from current branch (CORRECTED - use subdirectories)
-git worktree add -b kevin/experiment worktrees/experiment
+git worktree add -b ${USER}/experiment worktrees/experiment
 
 # Worktree for database migration testing (CORRECTED - use subdirectories)
-git worktree add -b kevin/migration-test worktrees/migration-test
+git worktree add -b ${USER}/migration-test worktrees/migration-test
 ```
 
 #### Integration with Message Agent Development
@@ -492,7 +492,7 @@ mcp__github__create_pull_request(
     owner="kevinfeng77",
     repo="messages-agent", 
     title="[LINEAR-TICKET] Description",
-    head="kevin/{branch-name}",
+    head="${USER}/{branch-name}",
     base="main",
     body="[Comprehensive PR description with metrics]"
 )
@@ -588,8 +588,8 @@ black --check src/ && isort --check-only src/ && flake8 src/ && mypy src/
 
 2. **Branch Creation (MANDATORY)**
    - **ALWAYS create a new feature branch** for each Linear ticket
-   - Use naming convention: `kevin/{ticket-description}` (e.g., `kevin/refactor-directory-tree`)
-   - Create branch from main/master: `git checkout -b kevin/{description}`
+   - Use naming convention: `${USER}/{ticket-description}` (e.g., `${USER}/refactor-directory-tree`)
+   - Create branch from main/master: `git checkout -b ${USER}/{description}`
    - Never work directly on main or existing branches for new tickets
 
 3. **Implementation**
@@ -614,7 +614,7 @@ black --check src/ && isort --check-only src/ && flake8 src/ && mypy src/
 6. **PR Creation (Use GitHub MCP) - MANDATORY**
    - **ALWAYS create PR when implementation checklist is completed**
    - Commit all changes with descriptive messages
-   - Push branch to origin: `git push -u origin kevin/{branch-name}`
+   - Push branch to origin: `git push -u origin ${USER}/{branch-name}`
    - Use `mcp__github__create_pull_request` to create PR
    - Include comprehensive description with:
      - Problem statement and solution
