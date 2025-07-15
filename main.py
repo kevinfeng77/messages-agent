@@ -55,11 +55,9 @@ def load_environment_variables():
         for var in missing_vars:
             print(f"  - {var}")
         print("\nPlease set your environment variables in one of these ways:")
+        print("  1. Create a .env file with: ANTHROPIC_API_KEY=your_api_key_here")
         print(
-            "  1. Create a .env file with: ANTHROPIC_API_KEY=your_api_key_here"
-        )
-        print(
-            '  2. Export as environment variable: '
+            "  2. Export as environment variable: "
             'export ANTHROPIC_API_KEY="your_api_key_here"'
         )
         return False
@@ -122,8 +120,7 @@ def get_user_phone_number(user_id: str) -> str:
             print(f"⚠️  User not found in database for user_id: {user_id}")
             # Fallback to manual input
             phone = input(
-                "Please enter the recipient's phone number "
-                "(e.g., +1234567890): "
+                "Please enter the recipient's phone number " "(e.g., +1234567890): "
             ).strip()
             if not phone:
                 raise ValueError("No phone number provided")
@@ -179,14 +176,10 @@ def generate_message_responses_with_context(
     Raises:
         Exception: If message generation fails
     """
-    print(f"🤖 Generating responses for: {display_name}")
-    print(f"📝 Message: {message_content}")
-    print(f"📚 Using {max_context_messages} messages for context")
 
     try:
         # Find chat by display name
         chat_id, user_id = find_chat_by_display_name(display_name)
-        print(f"   ✅ Found chat_id: {chat_id}, user_id: {user_id}")
 
         # Create request
         request = MessageRequest(
@@ -197,11 +190,9 @@ def generate_message_responses_with_context(
         response = generate_message_responses(request, max_context_messages)
         responses = response.get_responses()
 
-        print(f"   ✅ Generated {len(responses)} responses")
         return responses
 
     except Exception as e:
-        print(f"❌ Error generating responses: {e}")
         raise
 
 
@@ -237,9 +228,7 @@ def display_response_options(responses: list[str]) -> int:
             if 1 <= choice_num <= len(responses):
                 return choice_num - 1  # Convert to 0-based index
             else:
-                print(
-                    f"❌ Please enter a number between 1 and {len(responses)}"
-                )
+                print(f"❌ Please enter a number between 1 and {len(responses)}")
 
         except ValueError:
             print("❌ Please enter a valid number")
@@ -259,9 +248,6 @@ async def send_message_response(phone_number: str, message: str) -> bool:
     Returns:
         True if successful, False otherwise
     """
-    print(f"\n📤 Sending message to: {phone_number}")
-    print(f"💬 Message: {message}")
-    print("\n⏳ Sending...")
 
     try:
         # Create service (uses AppleScript)
@@ -276,43 +262,27 @@ async def send_message_response(phone_number: str, message: str) -> bool:
 
         if result.success:
             print("✅ Message sent successfully!")
-            print(f"   📨 Message ID: {result.message_id}")
-            print(f"   ⏱️  Duration: {result.duration_seconds:.2f}s")
-            if result.retry_count > 0:
-                print(f"   🔄 Retries: {result.retry_count}")
             return True
         else:
-            print(f"❌ Failed to send message: {result.error}")
             return False
 
     except Exception as e:
-        print(f"❌ Error sending message: {e}")
         return False
 
 
 async def main():
     """Main integration workflow."""
-    print("🤖 Message Agent - Integrated Workflow")
-    print("=" * 50)
+    # Check environment and database
+    if not load_environment_variables():
+        return 1
+
+    db_path = Path(DATABASE_PATH)
+    if not db_path.exists():
+        print(f"❌ Error: Database file not found at {DATABASE_PATH}")
+        print("Please run the database migration scripts first.")
+        return 1
 
     try:
-        # 1. Load and validate environment variables
-        print("1. Checking environment variables...")
-        if not load_environment_variables():
-            return 1
-        print("   ✅ Environment variables loaded")
-
-        # 2. Check if database exists
-        print("2. Checking database...")
-        db_path = Path(DATABASE_PATH)
-        if not db_path.exists():
-            print(f"❌ Error: Database file not found at {DATABASE_PATH}")
-            print("Please run the database migration scripts first.")
-            return 1
-        print("   ✅ Database found")
-
-        # 3. Get user input for new message
-        print("\n3. Getting message details...")
         display_name = input("Enter display name of the chat: ").strip()
         if not display_name:
             print("❌ No display name provided. Exiting.")
@@ -323,8 +293,7 @@ async def main():
             print("❌ No message content provided. Exiting.")
             return 1
 
-        # 4. Generate responses
-        print("\n4. Generating response options...")
+        # Generate responses
         responses = generate_message_responses_with_context(
             display_name, message_content
         )
@@ -332,31 +301,21 @@ async def main():
         if not responses:
             print("❌ No responses generated. Exiting.")
             return 1
-
-        # 5. Let user choose response
-        print("\n5. Selecting response...")
         selected_index = display_response_options(responses)
         selected_response = responses[selected_index]
         print(f"\n✅ Selected: {selected_response}")
-
-        # 6. Get recipient phone number
-        print("\n6. Getting recipient details...")
         try:
             chat_id, user_id = find_chat_by_display_name(display_name)
             phone_number = get_user_phone_number(user_id)
         except Exception as e:
             print(f"❌ Error getting recipient details: {e}")
             return 1
-
-        # 7. Send the message
-        print("\n7. Sending message...")
         success = await send_message_response(phone_number, selected_response)
 
         if success:
-            print("\n🎉 Workflow completed successfully!")
             return 0
         else:
-            print("\n❌ Workflow failed during message sending.")
+            print("❌ Workflow failed during message sending.")
             return 1
 
     except KeyboardInterrupt:
