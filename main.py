@@ -31,6 +31,7 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 from src.message_maker.api import generate_message_responses
 from src.message_maker.types import MessageRequest
 from src.database.messages_db import MessagesDatabase
+from src.user.user import User
 from messaging.service import MessageService
 from messaging.config import MessageConfig
 
@@ -110,13 +111,34 @@ def get_user_phone_number(user_id: str) -> str:
         ValueError: If user not found or no phone number available
     """
     db = MessagesDatabase()
-    # This is a placeholder - you'll need to implement this method in MessagesDatabase
-    # For now, we'll prompt the user for the phone number
-    print(f"⚠️  Phone number lookup not yet implemented for user_id: {user_id}")
-    phone = input("Please enter the recipient's phone number (e.g., +1234567890): ").strip()
-    if not phone:
-        raise ValueError("No phone number provided")
-    return phone
+    try:
+        user = db.get_user_by_id(user_id)
+        if not user:
+            print(f"⚠️  User not found in database for user_id: {user_id}")
+            # Fallback to manual input
+            phone = input("Please enter the recipient's phone number (e.g., +1234567890): ").strip()
+            if not phone:
+                raise ValueError("No phone number provided")
+            return phone
+        
+        if not user.phone_number:
+            print(f"⚠️  No phone number found for user: {user.first_name} {user.last_name}")
+            # Fallback to manual input
+            phone = input(f"Please enter phone number for {user.first_name} {user.last_name} (e.g., +1234567890): ").strip()
+            if not phone:
+                raise ValueError("No phone number provided")
+            return phone
+        
+        print(f"📞 Found phone number for {user.first_name} {user.last_name}: {user.phone_number}")
+        return user.phone_number
+        
+    except Exception as e:
+        print(f"❌ Error looking up user: {e}")
+        # Fallback to manual input
+        phone = input("Please enter the recipient's phone number (e.g., +1234567890): ").strip()
+        if not phone:
+            raise ValueError("No phone number provided")
+        return phone
 
 
 def generate_message_responses_with_context(display_name: str, message_content: str, max_context_messages: int = 200) -> list[str]:
