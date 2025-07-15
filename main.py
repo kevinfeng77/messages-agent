@@ -17,6 +17,14 @@ import os
 import sys
 from pathlib import Path
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # If python-dotenv is not installed, continue without .env loading
+    pass
+
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
@@ -29,22 +37,6 @@ from messaging.config import MessageConfig
 
 def load_environment_variables():
     """Load and validate required environment variables."""
-    # Try to load from .env file
-    env_file = Path(".env")
-    if env_file.exists():
-        try:
-            with open(env_file, 'r') as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith('#') and '=' in line:
-                        key, value = line.split('=', 1)
-                        key = key.strip()
-                        value = value.strip().strip('"').strip("'")
-                        os.environ[key] = value
-            print("   ✅ Loaded environment variables from .env file")
-        except Exception as e:
-            print(f"   ⚠️  Warning: Could not load .env file: {e}")
-    
     required_vars = ["ANTHROPIC_API_KEY"]
     missing_vars = []
     
@@ -62,9 +54,9 @@ def load_environment_variables():
         print("❌ Error: Missing required environment variables:")
         for var in missing_vars:
             print(f"  - {var}")
-        print("\nPlease set your environment variables:")
-        print("  export ANTHROPIC_API_KEY=\"your_api_key_here\"")
-        print("Or add them to a .env file in the project root")
+        print("\nPlease set your environment variables in one of these ways:")
+        print("  1. Create a .env file with: ANTHROPIC_API_KEY=your_api_key_here")
+        print("  2. Export as environment variable: export ANTHROPIC_API_KEY=\"your_api_key_here\"")
         return False
     
     return True
