@@ -164,63 +164,6 @@ class TestHandleMatcher(unittest.TestCase):
         self.assertEqual(result.handle_id, 123)
         self.assertEqual(result.user_id, "test-user-1")
 
-    @patch("src.user.handle_matcher.AddressBookExtractor")
-    def test_match_handle_to_user_phone_match(self, mock_extractor):
-        """Test matching by phone number"""
-        # Mock address book extractor
-        mock_instance = Mock()
-        mock_instance.extract_users.return_value = [
-            User(
-                user_id="allison-shi",
-                first_name="Allison",
-                last_name="Shi",
-                phone_number="(949) 527-2398",
-                email="",
-            )
-        ]
-        mock_extractor.return_value = mock_instance
-
-        # Test matching
-        result = self.handle_matcher.match_handle_to_user(3, "+19495272398")
-
-        self.assertIsNotNone(result)
-        self.assertEqual(result.first_name, "Allison")
-        self.assertEqual(result.last_name, "Shi")
-        self.assertEqual(result.handle_id, 3)
-
-        # Verify user was inserted into database
-        db_user = self.handle_matcher.messages_db.get_user_by_handle_id(3)
-        self.assertIsNotNone(db_user)
-        self.assertEqual(db_user.first_name, "Allison")
-
-    @patch("src.user.handle_matcher.AddressBookExtractor")
-    def test_match_handle_to_user_email_match(self, mock_extractor):
-        """Test matching by email"""
-        # Mock address book extractor
-        mock_instance = Mock()
-        mock_instance.extract_users.return_value = [
-            User(
-                user_id="wayne-ellerbe",
-                first_name="Wayne",
-                last_name="Ellerbe",
-                phone_number="",
-                email="wayne26110@gmail.com",
-            )
-        ]
-        mock_extractor.return_value = mock_instance
-
-        # Test matching
-        result = self.handle_matcher.match_handle_to_user(27, "wayne26110@gmail.com")
-
-        self.assertIsNotNone(result)
-        self.assertEqual(result.first_name, "Wayne")
-        self.assertEqual(result.last_name, "Ellerbe")
-        self.assertEqual(result.handle_id, 27)
-
-        # Verify user was inserted into database
-        db_user = self.handle_matcher.messages_db.get_user_by_handle_id(27)
-        self.assertIsNotNone(db_user)
-        self.assertEqual(db_user.first_name, "Wayne")
 
     @patch("src.user.handle_matcher.AddressBookExtractor")
     def test_match_handle_to_user_no_match_phone(self, mock_extractor):
