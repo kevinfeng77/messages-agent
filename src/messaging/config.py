@@ -7,7 +7,7 @@ including validation, timeouts, and service settings.
 
 import os
 from typing import Optional
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class MessageConfig(BaseModel):
@@ -69,7 +69,8 @@ class MessageConfig(BaseModel):
         description="Whether to log recipient info (privacy consideration)"
     )
     
-    @validator('max_message_length')
+    @field_validator('max_message_length')
+    @classmethod
     def validate_max_message_length(cls, v):
         if v <= 0:
             raise ValueError("max_message_length must be positive")
@@ -77,7 +78,8 @@ class MessageConfig(BaseModel):
             raise ValueError("max_message_length cannot exceed 10000 characters")
         return v
     
-    @validator('send_timeout_seconds')
+    @field_validator('send_timeout_seconds')
+    @classmethod
     def validate_send_timeout(cls, v):
         if v <= 0:
             raise ValueError("send_timeout_seconds must be positive")
@@ -85,7 +87,8 @@ class MessageConfig(BaseModel):
             raise ValueError("send_timeout_seconds cannot exceed 300 seconds")
         return v
     
-    @validator('max_retry_attempts')
+    @field_validator('max_retry_attempts')
+    @classmethod
     def validate_max_retry_attempts(cls, v):
         if v < 0:
             raise ValueError("max_retry_attempts must be non-negative")

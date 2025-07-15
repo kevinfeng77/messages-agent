@@ -42,29 +42,7 @@ from messaging.service import MessageService  # noqa: E402
 from messaging.config import MessageConfig  # noqa: E402
 
 
-def load_environment_variables():
-    """Load and validate required environment variables."""
-    missing_vars = []
-
-    for var in REQUIRED_ENV_VARS:
-        if not os.getenv(var):
-            missing_vars.append(var)
-
-    if missing_vars:
-        print("❌ Error: Missing required environment variables:")
-        for var in missing_vars:
-            print(f"  - {var}")
-        print("\nPlease set your environment variables in one of these ways:")
-        print("  1. Create a .env file with: ANTHROPIC_API_KEY=your_api_key_here")
-        print(
-            "  2. Export as environment variable: "
-            'export ANTHROPIC_API_KEY="your_api_key_here"'
-        )
-        return False
-
-    return True
-
-
+# Find chat by display name
 def find_chat_by_display_name(display_name: str) -> tuple[int, str]:
     """
     Find chat_id and first user_id by display name.
@@ -99,101 +77,6 @@ def find_chat_by_display_name(display_name: str) -> tuple[int, str]:
 
     return chat_id, user_id
 
-
-def get_user_phone_number(user_id: str) -> str:
-    """
-    Get phone number for a user_id from the database.
-
-    Args:
-        user_id: The user ID to look up
-
-    Returns:
-        Phone number string
-
-    Raises:
-        ValueError: If user not found or no phone number available
-    """
-    db = MessagesDatabase()
-    try:
-        user = db.get_user_by_id(user_id)
-        if not user:
-            print(f"⚠️  User not found in database for user_id: {user_id}")
-            # Fallback to manual input
-            phone = input(
-                "Please enter the recipient's phone number " "(e.g., +1234567890): "
-            ).strip()
-            if not phone:
-                raise ValueError("No phone number provided")
-            return phone
-
-        if not user.phone_number:
-            print(
-                f"⚠️  No phone number found for user: "
-                f"{user.first_name} {user.last_name}"
-            )
-            # Fallback to manual input
-            phone = input(
-                f"Please enter phone number for {user.first_name} "
-                f"{user.last_name} (e.g., +1234567890): "
-            ).strip()
-            if not phone:
-                raise ValueError("No phone number provided")
-            return phone
-
-        print(
-            f"📞 Found phone number for {user.first_name} "
-            f"{user.last_name}: {user.phone_number}"
-        )
-        return user.phone_number
-
-    except Exception as e:
-        print(f"❌ Error looking up user: {e}")
-        # Fallback to manual input
-        phone = input(
-            "Please enter the recipient's phone number (e.g., +1234567890): "
-        ).strip()
-        if not phone:
-            raise ValueError("No phone number provided")
-        return phone
-
-
-def generate_message_responses_with_context(
-    display_name: str,
-    message_content: str,
-    max_context_messages: int = DEFAULT_MAX_CONTEXT_MESSAGES,
-) -> list[str]:
-    """
-    Generate message responses using the message maker service.
-
-    Args:
-        display_name: Display name of the chat
-        message_content: Content of the message to respond to
-        max_context_messages: Maximum number of recent messages for context
-
-    Returns:
-        List of generated response strings
-
-    Raises:
-        Exception: If message generation fails
-    """
-
-    try:
-        # Find chat by display name
-        chat_id, user_id = find_chat_by_display_name(display_name)
-
-        # Create request
-        request = MessageRequest(
-            chat_id=chat_id, user_id=user_id, contents=message_content
-        )
-
-        # Generate responses
-        response = generate_message_responses(request, max_context_messages)
-        responses = response.get_responses()
-
-        return responses
-
-    except Exception as e:
-        raise
 
 
 def display_response_options(responses: list[str]) -> int:
@@ -237,98 +120,75 @@ def display_response_options(responses: list[str]) -> int:
             raise
 
 
-async def send_message_response(phone_number: str, message: str) -> bool:
-    """
-    Send the selected message response.
-
-    Args:
-        phone_number: Recipient phone number
-        message: Message content to send
-
-    Returns:
-        True if successful, False otherwise
-    """
-
-    try:
-        # Create service (uses AppleScript)
-        config = MessageConfig(
+async def main():
+    db = MessagesDatabase()
+    message_service = MessageService(
+        MessageConfig(
             require_imessage_enabled=False,  # Use AppleScript
             log_message_content=True,
             log_recipients=True,
         )
+    )
 
-        service = MessageService(config)
-        result = await service.send_message(phone_number, message)
+    # Get environment variables
+    for var in REQUIRED_ENV_VARS:
+        if not os.getenv(var):
+            print(f"Error: Missing required environment variable: {var}")
+            return 1
 
-        if result.success:
-            print("✅ Message sent successfully!")
-            return True
-        else:
-            return False
-
-    except Exception as e:
-        return False
-
-
-async def main():
-    """Main integration workflow."""
-    # Check environment and database
-    if not load_environment_variables():
-        return 1
-
+    # Check database
     db_path = Path(DATABASE_PATH)
     if not db_path.exists():
-        print(f"❌ Error: Database file not found at {DATABASE_PATH}")
-        print("Please run the database migration scripts first.")
+        print(f"Database file not found at {DATABASE_PATH}")
         return 1
 
+
+    # Get display name
+    display_name = input("Enter display name of the chat: ").strip()
+    if not display_name:
+        print("No display name provided. Exiting.")
+        return 1
+    
+    chat_id, user_id = find_chat_by_display_name(display_name)
+
+    # Get message content
+    message_content = input("Enter the message to respond to: ").strip()
+    if not message_content:
+        print("No message content provided. Exiting.")
+        return 1
+    
+    message_response = generate_message_responses(
+        MessageRequest(
+            chat_id=chat_id, user_id=user_id, contents=message_content
+        ),
+        max_context_messages=200
+    )
+    responses = message_response.get_responses()
+    if not responses:
+        print("No responses generated. Exiting.")
+        return 1
+
+    # Display response options
+    selected_index = display_response_options(responses)
+    selected_response = responses[selected_index]
+    print(f"\nSelected: {selected_response}")
+
+    # Get recipient details
     try:
-        display_name = input("Enter display name of the chat: ").strip()
-        if not display_name:
-            print("❌ No display name provided. Exiting.")
-            return 1
-
-        message_content = input("Enter the message to respond to: ").strip()
-        if not message_content:
-            print("❌ No message content provided. Exiting.")
-            return 1
-
-        # Generate responses
-        responses = generate_message_responses_with_context(
-            display_name, message_content
-        )
-
-        if not responses:
-            print("❌ No responses generated. Exiting.")
-            return 1
-        selected_index = display_response_options(responses)
-        selected_response = responses[selected_index]
-        print(f"\n✅ Selected: {selected_response}")
-        try:
-            chat_id, user_id = find_chat_by_display_name(display_name)
-            phone_number = get_user_phone_number(user_id)
-        except Exception as e:
-            print(f"❌ Error getting recipient details: {e}")
-            return 1
-        success = await send_message_response(phone_number, selected_response)
-
-        if success:
-            return 0
-        else:
-            print("❌ Workflow failed during message sending.")
-            return 1
-
-    except KeyboardInterrupt:
-        print("\n\n👋 Cancelled by user.")
-        return 1
+        phone_number = db.get_user_by_id(user_id).phone_number
     except Exception as e:
-        print(f"\n❌ Unexpected error: {e}")
-        import traceback
-
-        traceback.print_exc()
+        print(f"Error getting recipient details: {e}")
         return 1
+
+    # Send message
+    result = await message_service.send_message(phone_number, selected_response)
+    if not result.success:
+        print("Workflow failed during message sending.")
+        return 1
+
+    print("Workflow completed successfully!")
+    return 0
 
 
 if __name__ == "__main__":
-    exit_code = asyncio.run(main())
-    sys.exit(exit_code)
+    sys.exit(asyncio.run(main()))
