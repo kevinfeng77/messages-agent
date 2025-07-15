@@ -214,18 +214,26 @@ class LivePollingValidator:
             def on_new_messages(new_messages, synced_count):
                 detection_time = datetime.now()
                 for msg in new_messages:
+                    # Safely get content with fallbacks
+                    content = (msg.get("extracted_text") or 
+                              msg.get("text") or 
+                              "[No content]")
+                    
                     self.messages_detected.append({
-                        "rowid": msg["rowid"],
+                        "rowid": msg.get("rowid", 0),
                         "detection_time": detection_time.isoformat(),
-                        "contents": msg.get("extracted_text", msg.get("text", ""))[:100],  # First 100 chars
+                        "contents": str(content)[:100],  # First 100 chars, ensure it's a string
                         "is_from_me": msg.get("is_from_me", False)
                     })
                 
                 logger.info(f"🚨 LIVE DETECTION: {len(new_messages)} new messages, {synced_count} synced")
                 for i, msg in enumerate(new_messages[:3]):  # Show first 3
-                    content = msg.get("extracted_text", msg.get("text", ""))[:50]
+                    content = (msg.get("extracted_text") or 
+                              msg.get("text") or 
+                              "[No content]")
+                    content_str = str(content)[:50] if content else "[No content]"
                     sender = "You" if msg.get("is_from_me") else "Contact"
-                    logger.info(f"  {i+1}. {sender}: {content}... (ROWID: {msg['rowid']})")
+                    logger.info(f"  {i+1}. {sender}: {content_str}... (ROWID: {msg.get('rowid', 'Unknown')})")
             
             self.polling_service.set_new_message_callback(on_new_messages)
             

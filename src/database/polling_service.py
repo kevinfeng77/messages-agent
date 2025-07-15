@@ -238,6 +238,13 @@ class MessagePollingService:
             normalized_messages = []
 
             for msg in new_messages:
+                # Skip messages with invalid handle_id (system messages, etc.)
+                if msg["handle_id"] == 0 or msg["handle_id"] is None:
+                    logger.debug(
+                        f"Skipping system message with handle_id {msg['handle_id']} (ROWID: {msg['rowid']})"
+                    )
+                    continue
+                
                 # Resolve user from handle_id
                 user = self.resolve_user_from_handle(msg["handle_id"])
                 if not user:
