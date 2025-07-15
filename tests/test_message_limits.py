@@ -4,7 +4,7 @@
 import sys
 import time
 sys.path.insert(0, 'src')
-from load_env import load_env
+from src.utils.load_env import load_env
 load_env()
 
 from src.message_maker.chat_history import get_chat_history_for_message_generation
