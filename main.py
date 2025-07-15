@@ -78,44 +78,6 @@ def find_chat_by_display_name(display_name: str) -> tuple[int, str]:
     return chat_id, user_id
 
 
-def generate_message_responses_with_context(
-    display_name: str,
-    message_content: str,
-    max_context_messages: int = DEFAULT_MAX_CONTEXT_MESSAGES,
-) -> list[str]:
-    """
-    Generate message responses using the message maker service.
-
-    Args:
-        display_name: Display name of the chat
-        message_content: Content of the message to respond to
-        max_context_messages: Maximum number of recent messages for context
-
-    Returns:
-        List of generated response strings
-
-    Raises:
-        Exception: If message generation fails
-    """
-
-    try:
-        # Find chat by display name
-        chat_id, user_id = find_chat_by_display_name(display_name)
-
-        # Create request
-        request = MessageRequest(
-            chat_id=chat_id, user_id=user_id, contents=message_content
-        )
-
-        # Generate responses
-        response = generate_message_responses(request, max_context_messages)
-        responses = response.get_responses()
-
-        return responses
-
-    except Exception as e:
-        raise
-
 
 def display_response_options(responses: list[str]) -> int:
     """
@@ -158,10 +120,9 @@ def display_response_options(responses: list[str]) -> int:
             raise
 
 
-
 async def main():
     db = MessagesDatabase()
-    service = MessageService(
+    message_service = MessageService(
         MessageConfig(
             require_imessage_enabled=False,  # Use AppleScript
             log_message_content=True,
@@ -187,17 +148,22 @@ async def main():
     if not display_name:
         print("No display name provided. Exiting.")
         return 1
+    
+    chat_id, user_id = find_chat_by_display_name(display_name)
 
     # Get message content
     message_content = input("Enter the message to respond to: ").strip()
     if not message_content:
         print("No message content provided. Exiting.")
         return 1
-
-    # Generate responses
-    responses = generate_message_responses_with_context(
-        display_name, message_content
+    
+    message_response = generate_message_responses(
+        MessageRequest(
+            chat_id=chat_id, user_id=user_id, contents=message_content
+        ),
+        max_context_messages=200
     )
+    responses = message_response.get_responses()
     if not responses:
         print("No responses generated. Exiting.")
         return 1
@@ -209,14 +175,13 @@ async def main():
 
     # Get recipient details
     try:
-        _, user_id = find_chat_by_display_name(display_name)
         phone_number = db.get_user_by_id(user_id).phone_number
     except Exception as e:
         print(f"Error getting recipient details: {e}")
         return 1
 
     # Send message
-    result = await service.send_message(phone_number, selected_response)
+    result = await message_service.send_message(phone_number, selected_response)
     if not result.success:
         print("Workflow failed during message sending.")
         return 1
