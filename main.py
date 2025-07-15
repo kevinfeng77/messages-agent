@@ -73,6 +73,7 @@ def load_environment_variables():
 def find_chat_by_display_name(display_name: str) -> tuple[int, str]:
     """
     Find chat_id and first user_id by display name.
+    If multiple chats have the same display name, returns the one with the most messages.
     
     Args:
         display_name: The display name to search for
@@ -81,7 +82,7 @@ def find_chat_by_display_name(display_name: str) -> tuple[int, str]:
         Tuple of (chat_id, user_id)
         
     Raises:
-        ValueError: If display name not found or multiple chats found
+        ValueError: If display name not found or no users found for the chat
     """
     db = MessagesDatabase()
     chats = db.get_chats_by_display_name(display_name)
@@ -89,9 +90,7 @@ def find_chat_by_display_name(display_name: str) -> tuple[int, str]:
     if not chats:
         raise ValueError(f"No chat found with display name '{display_name}'")
     
-    if len(chats) > 1:
-        raise ValueError(f"Multiple chats found with display name '{display_name}'. Please use a more specific name.")
-    
+    # Take the first chat (which has the highest message count due to ordering)
     chat = chats[0]
     chat_id = chat['chat_id']
     user_ids = chat.get('user_ids', [])
