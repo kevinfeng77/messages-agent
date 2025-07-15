@@ -157,6 +157,78 @@ class TestChatsTable(unittest.TestCase):
         empty_chats = self.messages_db.get_chats_by_display_name("Non-existent")
         self.assertEqual(len(empty_chats), 0)
 
+    def test_get_chats_by_display_name_ordered_by_message_count(self):
+        """Test that chats with duplicate display names are ordered by message count (highest first)"""
+        # Insert test chats with duplicate display names
+        chats = [
+            {"chat_id": 250, "display_name": "Message Count Test", "user_ids": ["user1"]},
+            {"chat_id": 251, "display_name": "Message Count Test", "user_ids": ["user2"]},
+            {"chat_id": 252, "display_name": "Message Count Test", "user_ids": ["user3"]},
+        ]
+        self.messages_db.insert_chats_batch(chats)
+
+        # Insert some test users and messages to create different message counts
+        from src.user.user import User
+        users = [
+            User("user1", "User", "One", "+1111111111", "user1@example.com", 1),
+            User("user2", "User", "Two", "+2222222222", "user2@example.com", 2),
+            User("user3", "User", "Three", "+3333333333", "user3@example.com", 3),
+        ]
+        for user in users:
+            self.messages_db.insert_user(user)
+
+        # Insert messages for each chat to create different message counts
+        # Chat 250: 1 message
+        messages_250 = [{"message_id": "msg1", "user_id": "user1", "contents": "Hello", "is_from_me": 0, "created_at": 1000}]
+        self.messages_db.insert_messages_batch(messages_250)
+        chat_messages_250 = [{"chat_id": 250, "message_id": "msg1", "message_date": 1000}]
+        self.messages_db.insert_chat_messages_batch(chat_messages_250)
+
+        # Chat 251: 3 messages (highest count)
+        messages_251 = [
+            {"message_id": "msg2", "user_id": "user2", "contents": "Hi", "is_from_me": 0, "created_at": 2000},
+            {"message_id": "msg3", "user_id": "user2", "contents": "How are you?", "is_from_me": 0, "created_at": 3000},
+            {"message_id": "msg4", "user_id": "user2", "contents": "Great!", "is_from_me": 1, "created_at": 4000},
+        ]
+        self.messages_db.insert_messages_batch(messages_251)
+        chat_messages_251 = [
+            {"chat_id": 251, "message_id": "msg2", "message_date": 2000},
+            {"chat_id": 251, "message_id": "msg3", "message_date": 3000},
+            {"chat_id": 251, "message_id": "msg4", "message_date": 4000},
+        ]
+        self.messages_db.insert_chat_messages_batch(chat_messages_251)
+
+        # Chat 252: 2 messages
+        messages_252 = [
+            {"message_id": "msg5", "user_id": "user3", "contents": "Test", "is_from_me": 0, "created_at": 5000},
+            {"message_id": "msg6", "user_id": "user3", "contents": "Message", "is_from_me": 1, "created_at": 6000},
+        ]
+        self.messages_db.insert_messages_batch(messages_252)
+        chat_messages_252 = [
+            {"chat_id": 252, "message_id": "msg5", "message_date": 5000},
+            {"chat_id": 252, "message_id": "msg6", "message_date": 6000},
+        ]
+        self.messages_db.insert_chat_messages_batch(chat_messages_252)
+
+        # Get chats by display name - should be ordered by message count (highest first)
+        ordered_chats = self.messages_db.get_chats_by_display_name("Message Count Test")
+        
+        # Verify all 3 chats are returned
+        self.assertEqual(len(ordered_chats), 3)
+        
+        # Verify they are ordered by message count (highest first)
+        # Chat 251 has 3 messages (should be first)
+        # Chat 252 has 2 messages (should be second)  
+        # Chat 250 has 1 message (should be third)
+        self.assertEqual(ordered_chats[0]["chat_id"], 251)
+        self.assertEqual(ordered_chats[0]["message_count"], 3)
+        
+        self.assertEqual(ordered_chats[1]["chat_id"], 252)
+        self.assertEqual(ordered_chats[1]["message_count"], 2)
+        
+        self.assertEqual(ordered_chats[2]["chat_id"], 250)
+        self.assertEqual(ordered_chats[2]["message_count"], 1)
+
     def test_get_all_chats(self):
         """Test getting all chats"""
         # Initially empty
