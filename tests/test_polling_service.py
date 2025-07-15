@@ -126,8 +126,15 @@ class TestMessagePollingService(unittest.TestCase):
         mock_manager.create_safe_copy.return_value = Path(self.source_db_path)
         mock_db_manager.return_value = mock_manager
         
+        # Create polling service AFTER the patch is applied
+        polling_service = MessagePollingService(
+            data_dir=self.test_dir,
+            poll_interval=1,
+            batch_size=10
+        )
+        
         # Get messages since ROWID 0 (should get all)
-        new_messages = self.polling_service.get_new_messages_from_source(0)
+        new_messages = polling_service.get_new_messages_from_source(0)
         
         # Should get some messages
         self.assertGreater(len(new_messages), 0)
@@ -142,7 +149,7 @@ class TestMessagePollingService(unittest.TestCase):
         
         # Get messages since a higher ROWID (should get fewer messages)
         initial_count = len(new_messages)
-        later_messages = self.polling_service.get_new_messages_from_source(2)
+        later_messages = polling_service.get_new_messages_from_source(2)
         
         # Should get fewer messages when starting from later ROWID
         self.assertLessEqual(len(later_messages), initial_count)
@@ -158,7 +165,14 @@ class TestMessagePollingService(unittest.TestCase):
         
         mock_extract_text.side_effect = lambda text, blob: text or "extracted_text"
         
-        new_messages = self.polling_service.get_new_messages_from_source(0)
+        # Create polling service AFTER the patch is applied
+        polling_service = MessagePollingService(
+            data_dir=self.test_dir,
+            poll_interval=1,
+            batch_size=10
+        )
+        
+        new_messages = polling_service.get_new_messages_from_source(0)
         
         # Should have called extract_message_text for each message  
         self.assertGreater(mock_extract_text.call_count, 0)

@@ -6,7 +6,7 @@ import sys
 sys.path.append('src')
 
 # Load .env file for local development
-from load_env import load_env
+from src.utils.load_env import load_env
 load_env()
 
 from message_maker.llm_client import LLMClient

@@ -51,3 +51,6 @@ data/
 # Temporary files
 *.tmp
 *.temp
+
+# Local test files (depend on local data)
+tests/unit/user/local_handle_matcher_tests.py

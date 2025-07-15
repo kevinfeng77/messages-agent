@@ -8,7 +8,7 @@ from pathlib import Path
 import sys
 
 # Add the project root to the path so we can import our modules
-sys.path.append(str(Path(__file__).parent.parent.parent))
+sys.path.append(str(Path(__file__).parent.parent.parent.parent))
 
 from src.database.messages_db import MessagesDatabase
 
@@ -106,7 +106,7 @@ class TestMessagesDatabaseChats(unittest.TestCase):
 
     def test_insert_chat_basic(self):
         """Test basic chat insertion"""
-        chat_id = "test_chat_1"
+        chat_id = 12345
         display_name = "Test Chat"
         user_ids = ["user1", "user2"]
 
@@ -122,7 +122,7 @@ class TestMessagesDatabaseChats(unittest.TestCase):
 
     def test_insert_chat_special_characters(self):
         """Test chat insertion with special characters"""
-        chat_id = "special_chat"
+        chat_id = 20001
         display_name = "Chat with 🎉 emojis & symbols!"
         user_ids = ["user@domain.com", "user+tag@example.org"]
 
@@ -135,7 +135,7 @@ class TestMessagesDatabaseChats(unittest.TestCase):
 
     def test_insert_chat_empty_user_list(self):
         """Test inserting chat with empty user list"""
-        chat_id = "empty_chat"
+        chat_id = 20002
         display_name = "Empty Chat"
         user_ids = []
 
@@ -147,7 +147,7 @@ class TestMessagesDatabaseChats(unittest.TestCase):
 
     def test_insert_chat_none_user_list(self):
         """Test inserting chat with None as user list"""
-        chat_id = "none_chat"
+        chat_id = 20003
         display_name = "None Users Chat"
         user_ids = None
 
@@ -161,12 +161,12 @@ class TestMessagesDatabaseChats(unittest.TestCase):
         """Test successful batch insertion of chats"""
         chats = [
             {
-                "chat_id": "batch1",
+                "chat_id": 20004,
                 "display_name": "Batch Chat 1",
                 "user_ids": ["u1", "u2"],
             },
-            {"chat_id": "batch2", "display_name": "Batch Chat 2", "user_ids": ["u3"]},
-            {"chat_id": "batch3", "display_name": "Batch Chat 3", "user_ids": []},
+            {"chat_id": 20005, "display_name": "Batch Chat 2", "user_ids": ["u3"]},
+            {"chat_id": 20006, "display_name": "Batch Chat 3", "user_ids": []},
         ]
 
         count = self.messages_db.insert_chats_batch(chats)
@@ -186,21 +186,21 @@ class TestMessagesDatabaseChats(unittest.TestCase):
 
     def test_get_chat_by_id_not_found(self):
         """Test getting non-existent chat"""
-        chat = self.messages_db.get_chat_by_id("nonexistent")
+        chat = self.messages_db.get_chat_by_id(99999)
         self.assertIsNone(chat)
 
     def test_get_chats_by_display_name_exact_match(self):
         """Test getting chats by exact display name match"""
         # Insert test chats
         test_chats = [
-            {"chat_id": "exact1", "display_name": "Exact Match", "user_ids": ["u1"]},
+            {"chat_id": 20007, "display_name": "Exact Match", "user_ids": ["u1"]},
             {
-                "chat_id": "exact2",
+                "chat_id": 20008,
                 "display_name": "exact match",
                 "user_ids": ["u2"],
             },  # Different case
             {
-                "chat_id": "exact3",
+                "chat_id": 20009,
                 "display_name": "Exact Match",
                 "user_ids": ["u3"],
             },  # Duplicate
@@ -213,9 +213,9 @@ class TestMessagesDatabaseChats(unittest.TestCase):
         self.assertEqual(len(matches), 2)  # Should match exact1 and exact3
 
         chat_ids = [chat["chat_id"] for chat in matches]
-        self.assertIn("exact1", chat_ids)
-        self.assertIn("exact3", chat_ids)
-        self.assertNotIn("exact2", chat_ids)  # Different case
+        self.assertIn(20007, chat_ids)
+        self.assertIn(20009, chat_ids)
+        self.assertNotIn(20008, chat_ids)  # Different case
 
     def test_get_chats_by_display_name_no_match(self):
         """Test getting chats with non-existent display name"""
@@ -231,9 +231,9 @@ class TestMessagesDatabaseChats(unittest.TestCase):
         """Test getting all chats with data"""
         # Insert test chats
         test_chats = [
-            {"chat_id": "all1", "display_name": "Chat 1", "user_ids": ["u1"]},
-            {"chat_id": "all2", "display_name": "Chat 2", "user_ids": ["u2"]},
-            {"chat_id": "all3", "display_name": "Chat 3", "user_ids": ["u3"]},
+            {"chat_id": 20010, "display_name": "Chat 1", "user_ids": ["u1"]},
+            {"chat_id": 20011, "display_name": "Chat 2", "user_ids": ["u2"]},
+            {"chat_id": 20012, "display_name": "Chat 3", "user_ids": ["u3"]},
         ]
 
         self.messages_db.insert_chats_batch(test_chats)
@@ -245,7 +245,7 @@ class TestMessagesDatabaseChats(unittest.TestCase):
         """Test getting all chats with limit"""
         # Insert 5 test chats
         test_chats = [
-            {"chat_id": f"limit{i}", "display_name": f"Chat {i}", "user_ids": [f"u{i}"]}
+            {"chat_id": 20013 + i, "display_name": f"Chat {i}", "user_ids": [f"u{i}"]}
             for i in range(5)
         ]
 
@@ -264,8 +264,8 @@ class TestMessagesDatabaseChats(unittest.TestCase):
         """Test clearing chats table with data"""
         # Insert test chats
         test_chats = [
-            {"chat_id": "clear1", "display_name": "Chat 1", "user_ids": ["u1"]},
-            {"chat_id": "clear2", "display_name": "Chat 2", "user_ids": ["u2"]},
+            {"chat_id": 20018, "display_name": "Chat 1", "user_ids": ["u1"]},
+            {"chat_id": 20019, "display_name": "Chat 2", "user_ids": ["u2"]},
         ]
 
         self.messages_db.insert_chats_batch(test_chats)
@@ -282,7 +282,7 @@ class TestMessagesDatabaseChats(unittest.TestCase):
 
     def test_user_ids_normalized_storage(self):
         """Test that user IDs are properly stored in normalized chat_users table"""
-        chat_id = "normalized_test"
+        chat_id = 20020
         display_name = "Normalized Test"
         user_ids = ["user,with,commas", "normal_user", "user@email.com"]
 
@@ -309,7 +309,7 @@ class TestMessagesDatabaseChats(unittest.TestCase):
 
     def test_large_user_list(self):
         """Test handling of large user lists"""
-        chat_id = "large_test"
+        chat_id = 20021
         display_name = "Large User List"
         user_ids = [f"user_{i}" for i in range(100)]  # 100 users
 
@@ -322,7 +322,7 @@ class TestMessagesDatabaseChats(unittest.TestCase):
 
     def test_unicode_handling(self):
         """Test handling of Unicode characters in chat data"""
-        chat_id = "unicode_test"
+        chat_id = 20022
         display_name = "Unicode Test 中文 ñäñó 🚀"
         user_ids = ["用户1", "usuário2", "пользователь3"]
 
@@ -341,7 +341,7 @@ class TestMessagesDatabaseChats(unittest.TestCase):
         results = []
 
         def insert_chat(thread_id):
-            chat_id = f"thread_{thread_id}"
+            chat_id = 20023 + thread_id
             display_name = f"Thread Chat {thread_id}"
             user_ids = [f"user_{thread_id}"]
 
@@ -370,7 +370,7 @@ class TestMessagesDatabaseChats(unittest.TestCase):
 
     def test_add_user_to_chat(self):
         """Test adding a user to an existing chat"""
-        chat_id = "add_user_test"
+        chat_id = 20028
         display_name = "Add User Test"
         initial_users = ["user1", "user2"]
 
@@ -397,7 +397,7 @@ class TestMessagesDatabaseChats(unittest.TestCase):
 
     def test_remove_user_from_chat(self):
         """Test removing a user from a chat"""
-        chat_id = "remove_user_test"
+        chat_id = 20029
         display_name = "Remove User Test"
         initial_users = ["user1", "user2", "user3"]
 
@@ -423,21 +423,21 @@ class TestMessagesDatabaseChats(unittest.TestCase):
         # Create multiple chats with different user combinations
         chats_data = [
             {
-                "chat_id": "chat1",
+                "chat_id": 20030,
                 "display_name": "Chat 1",
                 "user_ids": ["user1", "user2"],
             },
             {
-                "chat_id": "chat2",
+                "chat_id": 20031,
                 "display_name": "Chat 2",
                 "user_ids": ["user1", "user3"],
             },
             {
-                "chat_id": "chat3",
+                "chat_id": 20032,
                 "display_name": "Chat 3",
                 "user_ids": ["user2", "user3"],
             },
-            {"chat_id": "chat4", "display_name": "Chat 4", "user_ids": ["user4"]},
+            {"chat_id": 20033, "display_name": "Chat 4", "user_ids": ["user4"]},
         ]
 
         self.messages_db.insert_chats_batch(chats_data)
@@ -446,13 +446,13 @@ class TestMessagesDatabaseChats(unittest.TestCase):
         user1_chats = self.messages_db.get_chats_for_user("user1")
         self.assertEqual(len(user1_chats), 2)
         chat_ids = [chat["chat_id"] for chat in user1_chats]
-        self.assertIn("chat1", chat_ids)
-        self.assertIn("chat2", chat_ids)
+        self.assertIn(20030, chat_ids)
+        self.assertIn(20031, chat_ids)
 
         # Get chats for user4
         user4_chats = self.messages_db.get_chats_for_user("user4")
         self.assertEqual(len(user4_chats), 1)
-        self.assertEqual(user4_chats[0]["chat_id"], "chat4")
+        self.assertEqual(user4_chats[0]["chat_id"], 20033)
 
         # Get chats for non-existent user
         empty_chats = self.messages_db.get_chats_for_user("nonexistent")
@@ -472,7 +472,7 @@ class TestMessagesDatabaseChats(unittest.TestCase):
             self.messages_db.insert_user(user)
 
         # Create a chat with these users
-        chat_id = "details_test"
+        chat_id = 20034
         display_name = "Details Test"
         user_ids = ["user1", "user2"]
 
@@ -491,7 +491,7 @@ class TestMessagesDatabaseChats(unittest.TestCase):
         self.assertIn("Jane Smith", user_names)
 
         # Test with chat that has no users
-        empty_chat_id = "empty_details_test"
+        empty_chat_id = 20035
         self.messages_db.insert_chat(empty_chat_id, "Empty Details Test", [])
         empty_details = self.messages_db.get_chat_users_with_details(empty_chat_id)
         self.assertEqual(len(empty_details), 0)

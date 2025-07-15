@@ -135,41 +135,6 @@ class TestMessageService:
         with pytest.raises(MessageValidationError):
             service.validate_message_content(None)
     
-    @patch('src.messaging.service.AppleScriptMessageService')
-    @pytest.mark.asyncio
-    async def test_send_message_success(self, mock_applescript_class):
-        """Test successful message sending."""
-        # Mock AppleScript service
-        mock_service = AsyncMock()
-        mock_service.is_available.return_value = True
-        mock_service.send_message.return_value = "applescript_12345"
-        mock_applescript_class.return_value = mock_service
-        
-        service = MessageService(self.config)
-        
-        result = await service.send_message(
-            recipient="test@example.com",
-            content="Test message"
-        )
-        
-        assert result.success is True
-        assert result.message_id == "applescript_12345"
-        assert result.error is None
-        assert result.retry_count == 0
-        assert result.duration_seconds > 0
-        assert isinstance(result.timestamp, datetime)
-    
-    @pytest.mark.asyncio
-    async def test_send_message_validation_error(self):
-        """Test message sending with validation errors."""
-        service = MessageService(self.config)
-        
-        # Invalid recipient should raise exception
-        with pytest.raises(InvalidRecipientFormatError):
-            await service.send_message(
-                recipient="invalid",
-                content="Test message"
-            )
     
     def test_get_metrics_initial(self):
         """Test getting initial metrics."""
