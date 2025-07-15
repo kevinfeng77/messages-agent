@@ -89,8 +89,8 @@ class MessagePollingService:
                 logger.error("Failed to create database copy")
                 return []
 
-            # Query for new messages
-            with sqlite3.connect(str(copy_path)) as conn:
+            # Query for new messages with read-only connection
+            with sqlite3.connect(f"file:{copy_path}?mode=ro", uri=True) as conn:
                 cursor = conn.cursor()
 
                 # Get messages with ROWID > last_processed_rowid
@@ -238,6 +238,13 @@ class MessagePollingService:
             normalized_messages = []
 
             for msg in new_messages:
+                # Skip messages with invalid handle_id (system messages, etc.)
+                if msg["handle_id"] == 0 or msg["handle_id"] is None:
+                    logger.debug(
+                        f"Skipping system message with handle_id {msg['handle_id']} (ROWID: {msg['rowid']})"
+                    )
+                    continue
+                
                 # Resolve user from handle_id
                 user = self.resolve_user_from_handle(msg["handle_id"])
                 if not user:

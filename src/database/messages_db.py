@@ -1086,7 +1086,7 @@ class MessagesDatabase:
 
                 cursor.executemany(
                     """
-                    INSERT INTO messages (message_id, user_id, contents, is_from_me, created_at)
+                    INSERT OR IGNORE INTO messages (message_id, user_id, contents, is_from_me, created_at)
                     VALUES (?, ?, ?, ?, ?)
                 """,
                     message_data,
