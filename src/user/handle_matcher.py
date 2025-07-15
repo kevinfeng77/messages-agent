@@ -314,3 +314,46 @@ class HandleMatcher:
             logger.error(f"Failed to insert fallback user: {user}")
 
         return user
+
+    def resolve_user_from_handle_id(self, handle_id: int) -> Optional[User]:
+        """
+        Resolve a user from just the handle_id by querying the source Messages database
+
+        Args:
+            handle_id: Handle ID from Messages database
+
+        Returns:
+            User object or None if resolution fails
+        """
+        try:
+            # Import here to avoid circular imports
+            from src.database.manager import DatabaseManager
+
+            # Create fresh copy of Messages database
+            db_manager = DatabaseManager()
+            copy_path = db_manager.create_safe_copy()
+            if not copy_path:
+                logger.error("Failed to create database copy for handle resolution")
+                return None
+
+            # Query the handle table to get the handle.id value
+            import sqlite3
+
+            with sqlite3.connect(str(copy_path)) as conn:
+                cursor = conn.cursor()
+
+                cursor.execute("SELECT id FROM handle WHERE ROWID = ?", (handle_id,))
+
+                row = cursor.fetchone()
+                if not row:
+                    logger.warning(f"No handle found for handle_id {handle_id}")
+                    return None
+
+                handle_id_value = row[0]
+
+            # Use existing matching logic
+            return self.match_handle_to_user(handle_id, handle_id_value)
+
+        except Exception as e:
+            logger.error(f"Error resolving user from handle_id {handle_id}: {e}")
+            return None
