@@ -17,34 +17,27 @@ import os
 import sys
 from pathlib import Path
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # If python-dotenv is not installed, continue without .env loading
+    pass
+
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 from src.message_maker.api import generate_message_responses
 from src.message_maker.types import MessageRequest
 from src.database.messages_db import MessagesDatabase
+from src.user.user import User
 from messaging.service import MessageService
 from messaging.config import MessageConfig
 
 
 def load_environment_variables():
     """Load and validate required environment variables."""
-    # Try to load from .env file
-    env_file = Path(".env")
-    if env_file.exists():
-        try:
-            with open(env_file, 'r') as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith('#') and '=' in line:
-                        key, value = line.split('=', 1)
-                        key = key.strip()
-                        value = value.strip().strip('"').strip("'")
-                        os.environ[key] = value
-            print("   ✅ Loaded environment variables from .env file")
-        except Exception as e:
-            print(f"   ⚠️  Warning: Could not load .env file: {e}")
-    
     required_vars = ["ANTHROPIC_API_KEY"]
     missing_vars = []
     
@@ -62,9 +55,9 @@ def load_environment_variables():
         print("❌ Error: Missing required environment variables:")
         for var in missing_vars:
             print(f"  - {var}")
-        print("\nPlease set your environment variables:")
-        print("  export ANTHROPIC_API_KEY=\"your_api_key_here\"")
-        print("Or add them to a .env file in the project root")
+        print("\nPlease set your environment variables in one of these ways:")
+        print("  1. Create a .env file with: ANTHROPIC_API_KEY=your_api_key_here")
+        print("  2. Export as environment variable: export ANTHROPIC_API_KEY=\"your_api_key_here\"")
         return False
     
     return True
@@ -73,6 +66,7 @@ def load_environment_variables():
 def find_chat_by_display_name(display_name: str) -> tuple[int, str]:
     """
     Find chat_id and first user_id by display name.
+    If multiple chats have the same display name, returns the one with the most messages.
     
     Args:
         display_name: The display name to search for
@@ -81,7 +75,7 @@ def find_chat_by_display_name(display_name: str) -> tuple[int, str]:
         Tuple of (chat_id, user_id)
         
     Raises:
-        ValueError: If display name not found or multiple chats found
+        ValueError: If display name not found or no users found for the chat
     """
     db = MessagesDatabase()
     chats = db.get_chats_by_display_name(display_name)
@@ -89,9 +83,7 @@ def find_chat_by_display_name(display_name: str) -> tuple[int, str]:
     if not chats:
         raise ValueError(f"No chat found with display name '{display_name}'")
     
-    if len(chats) > 1:
-        raise ValueError(f"Multiple chats found with display name '{display_name}'. Please use a more specific name.")
-    
+    # Take the first chat (which has the highest message count due to ordering)
     chat = chats[0]
     chat_id = chat['chat_id']
     user_ids = chat.get('user_ids', [])
@@ -119,13 +111,34 @@ def get_user_phone_number(user_id: str) -> str:
         ValueError: If user not found or no phone number available
     """
     db = MessagesDatabase()
-    # This is a placeholder - you'll need to implement this method in MessagesDatabase
-    # For now, we'll prompt the user for the phone number
-    print(f"⚠️  Phone number lookup not yet implemented for user_id: {user_id}")
-    phone = input("Please enter the recipient's phone number (e.g., +1234567890): ").strip()
-    if not phone:
-        raise ValueError("No phone number provided")
-    return phone
+    try:
+        user = db.get_user_by_id(user_id)
+        if not user:
+            print(f"⚠️  User not found in database for user_id: {user_id}")
+            # Fallback to manual input
+            phone = input("Please enter the recipient's phone number (e.g., +1234567890): ").strip()
+            if not phone:
+                raise ValueError("No phone number provided")
+            return phone
+        
+        if not user.phone_number:
+            print(f"⚠️  No phone number found for user: {user.first_name} {user.last_name}")
+            # Fallback to manual input
+            phone = input(f"Please enter phone number for {user.first_name} {user.last_name} (e.g., +1234567890): ").strip()
+            if not phone:
+                raise ValueError("No phone number provided")
+            return phone
+        
+        print(f"📞 Found phone number for {user.first_name} {user.last_name}: {user.phone_number}")
+        return user.phone_number
+        
+    except Exception as e:
+        print(f"❌ Error looking up user: {e}")
+        # Fallback to manual input
+        phone = input("Please enter the recipient's phone number (e.g., +1234567890): ").strip()
+        if not phone:
+            raise ValueError("No phone number provided")
+        return phone
 
 
 def generate_message_responses_with_context(display_name: str, message_content: str, max_context_messages: int = 200) -> list[str]:

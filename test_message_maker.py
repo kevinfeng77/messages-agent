@@ -14,6 +14,14 @@ import sys
 import os
 from pathlib import Path
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # If python-dotenv is not installed, continue without .env loading
+    pass
+
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
@@ -25,6 +33,7 @@ from src.database.messages_db import MessagesDatabase
 def find_chat_by_display_name(display_name: str) -> tuple[int, str]:
     """
     Find chat_id and first user_id by display name.
+    If multiple chats have the same display name, returns the one with the most messages.
     
     Args:
         display_name: The display name to search for
@@ -33,7 +42,7 @@ def find_chat_by_display_name(display_name: str) -> tuple[int, str]:
         Tuple of (chat_id, user_id)
         
     Raises:
-        ValueError: If display name not found or multiple chats found
+        ValueError: If display name not found or no users found for the chat
     """
     db = MessagesDatabase()
     chats = db.get_chats_by_display_name(display_name)
@@ -41,9 +50,7 @@ def find_chat_by_display_name(display_name: str) -> tuple[int, str]:
     if not chats:
         raise ValueError(f"No chat found with display name '{display_name}'")
     
-    if len(chats) > 1:
-        raise ValueError(f"Multiple chats found with display name '{display_name}'. Please use a more specific name.")
-    
+    # Take the first chat (which has the highest message count due to ordering)
     chat = chats[0]
     chat_id = chat['chat_id']
     user_ids = chat.get('user_ids', [])
@@ -130,8 +137,9 @@ def main():
     # Check for required environment variables
     if not os.getenv("ANTHROPIC_API_KEY"):
         print("❌ Error: ANTHROPIC_API_KEY environment variable is required")
-        print("Please set your Anthropic API key:")
-        print("  export ANTHROPIC_API_KEY=\"your_api_key_here\"")
+        print("Please set your Anthropic API key in one of these ways:")
+        print("  1. Create a .env file with: ANTHROPIC_API_KEY=your_api_key_here")
+        print("  2. Export as environment variable: export ANTHROPIC_API_KEY=\"your_api_key_here\"")
         sys.exit(1)
     
     # Check if database exists

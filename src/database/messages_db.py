@@ -730,18 +730,21 @@ class MessagesDatabase:
             display_name: Display name to search for
 
         Returns:
-            List of chat dictionaries with user_ids
+            List of chat dictionaries with user_ids, ordered by message count (highest first)
         """
         try:
             with sqlite3.connect(str(self.db_path)) as conn:
                 cursor = conn.cursor()
 
-                # Get chats with the display name
+                # Get chats with the display name, ordered by message count (highest first)
                 cursor.execute(
                     """
-                    SELECT chat_id, display_name
-                    FROM chats WHERE display_name = ?
-                    ORDER BY chat_id
+                    SELECT c.chat_id, c.display_name, COALESCE(COUNT(cm.message_id), 0) as message_count
+                    FROM chats c
+                    LEFT JOIN chat_messages cm ON c.chat_id = cm.chat_id
+                    WHERE c.display_name = ?
+                    GROUP BY c.chat_id, c.display_name
+                    ORDER BY message_count DESC, c.chat_id
                 """,
                     (display_name,),
                 )
@@ -751,7 +754,7 @@ class MessagesDatabase:
                     return []
 
                 chats = []
-                for chat_id, display_name in chat_rows:
+                for chat_id, display_name, message_count in chat_rows:
                     # Get users for this chat
                     cursor.execute(
                         """
@@ -769,6 +772,7 @@ class MessagesDatabase:
                             "chat_id": chat_id,
                             "display_name": display_name,
                             "user_ids": user_ids,
+                            "message_count": message_count,
                         }
                     )
 
