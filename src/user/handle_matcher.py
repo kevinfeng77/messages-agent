@@ -284,7 +284,7 @@ class HandleMatcher:
         """
         # Determine if it's a phone or email
         if self._looks_like_phone(handle_id_value):
-            phone = self.extract_phone_from_handle_id(handle_id_value) or ""
+            phone = self.extract_phone_from_handle_id(handle_id_value) or handle_id_value
             email = ""
         elif self._looks_like_email(handle_id_value):
             phone = ""
@@ -297,6 +297,14 @@ class HandleMatcher:
             else:
                 phone = ""
                 email = handle_id_value
+        
+        # Ensure we have at least one contact method
+        if not phone and not email:
+            # Use the raw handle_id_value as fallback
+            if '@' in handle_id_value:
+                email = handle_id_value
+            else:
+                phone = handle_id_value
 
         user = User.from_address_book_record(
             first_name="",  # Empty as specified in ticket

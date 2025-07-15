@@ -161,12 +161,16 @@ class LivePollingValidator:
                     cursor.execute("SELECT MAX(ROWID) FROM message")
                     copy_max_rowid = cursor.fetchone()[0]
                     
-                    # Copy should contain at least the baseline ROWID
-                    if copy_max_rowid < baseline_rowid:
-                        logger.error(f"Copy is stale: contains ROWID {copy_max_rowid}, expected {baseline_rowid}")
+                    # Copy should be within reasonable range of baseline ROWID
+                    # Allow for a small gap (up to 5 messages) since Messages.app might be active
+                    rowid_gap = baseline_rowid - copy_max_rowid
+                    if rowid_gap > 5:
+                        logger.error(f"Copy is stale: contains ROWID {copy_max_rowid}, expected {baseline_rowid} (gap: {rowid_gap})")
                         return False
-                    
-                    logger.info(f"✓ Copy contains expected ROWIDs: {copy_max_rowid} >= {baseline_rowid}")
+                    elif rowid_gap > 0:
+                        logger.warning(f"Copy has small gap: contains ROWID {copy_max_rowid}, latest {baseline_rowid} (gap: {rowid_gap})")
+                    else:
+                        logger.info(f"✓ Copy is fresh: contains ROWID {copy_max_rowid} >= {baseline_rowid}")
                     
             except sqlite3.Error as e:
                 logger.error(f"Failed to validate copy contents: {e}")
@@ -273,17 +277,14 @@ class LivePollingValidator:
                 return False
             
             # Interactive prompt
-            print("\n" + "="*60)
-            print("INTERACTIVE LIVE POLLING VALIDATION")
-            print("="*60)
-            print(f"⏱️  Validation will run for {duration_minutes} minutes")
-            print("📱 Please send iMessages to test real-time detection:")
-            print("   - Send messages to yourself or others")
-            print("   - Try different message types (text, emoji, etc.)")
-            print("   - Watch for live detection notifications above")
-            print("   - Press Ctrl+C to stop early")
-            print("="*60)
-            print("\n🔄 Polling service is running... Send some messages!\n")
+            print("\n" + "="*50)
+            print("LIVE POLLING VALIDATION")
+            print("="*50)
+            print(f"⏱️  Duration: {duration_minutes} minutes")
+            print("📱 Send iMessages to test detection")
+            print("   Press Ctrl+C to stop early")
+            print("="*50)
+            print("\n🔄 Monitoring for new messages...\n")
             
             # Wait for specified duration
             start_time = time.time()

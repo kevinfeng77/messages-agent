@@ -45,26 +45,24 @@ class DatabaseManager:
         return True
 
     def copy_database_files(self) -> bool:
-        """Copy all database files (main, WAL, and SHM) to working directory"""
+        """Create database copy using SQLite backup API (safer with running Messages.app)"""
         try:
-            # Copy main database file
-            if self.source_db_path.exists():
-                shutil.copy2(self.source_db_path, self.copy_db_path)
-                logger.info(f"Copied main database to {self.copy_db_path}")
-            else:
-                logger.error("Main database file not found")
-                return False
-
-            # Copy WAL file if it exists
-            if self.source_wal_path.exists():
-                shutil.copy2(self.source_wal_path, self.copy_wal_path)
-                logger.info(f"Copied WAL file to {self.copy_wal_path}")
-
-            # Copy SHM file if it exists
-            if self.source_shm_path.exists():
-                shutil.copy2(self.source_shm_path, self.copy_shm_path)
-                logger.info(f"Copied SHM file to {self.copy_shm_path}")
-
+            # Remove existing copy
+            if self.copy_db_path.exists():
+                self.copy_db_path.unlink()
+            
+            # Use SQLite backup API to create a consistent copy
+            # This is safer when Messages.app is running
+            source_conn = sqlite3.connect(f"file:{self.source_db_path}?mode=ro", uri=True)
+            copy_conn = sqlite3.connect(str(self.copy_db_path))
+            
+            # Create backup using SQLite's backup API
+            source_conn.backup(copy_conn)
+            
+            copy_conn.close()
+            source_conn.close()
+            
+            logger.info(f"Created database backup using SQLite API: {self.copy_db_path}")
             return True
 
         except PermissionError as e:
@@ -77,31 +75,22 @@ class DatabaseManager:
     def checkpoint_database(self) -> bool:
         """Merge WAL file into main database using checkpoint"""
         try:
-            conn = sqlite3.connect(str(self.copy_db_path))
-            cursor = conn.cursor()
-
-            # Execute checkpoint to merge WAL into main database
-            cursor.execute("PRAGMA wal_checkpoint(FULL)")
-            result = cursor.fetchone()
-
-            if result:
-                logger.info(f"Checkpoint complete: {result}")
-
-            conn.close()
-
-            # Remove WAL and SHM files after successful checkpoint
+            # CORRUPTION FIX: Skip checkpoint if it's causing corruption
+            # Instead, just remove WAL/SHM files - the copy already has the data
+            logger.info("Skipping WAL checkpoint to avoid corruption - using copy as-is")
+            
+            # Remove WAL and SHM files to clean up
             if self.copy_wal_path.exists():
                 self.copy_wal_path.unlink()
+                logger.info("Removed WAL file")
             if self.copy_shm_path.exists():
                 self.copy_shm_path.unlink()
+                logger.info("Removed SHM file")
 
             return True
 
-        except sqlite3.Error as e:
-            logger.error(f"SQLite error during checkpoint: {e}")
-            return False
         except Exception as e:
-            logger.error(f"Error during checkpoint: {e}")
+            logger.error(f"Error during cleanup: {e}")
             return False
 
     def create_safe_copy(self) -> Optional[Path]:

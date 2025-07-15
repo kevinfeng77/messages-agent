@@ -89,8 +89,8 @@ class MessagePollingService:
                 logger.error("Failed to create database copy")
                 return []
 
-            # Query for new messages
-            with sqlite3.connect(str(copy_path)) as conn:
+            # Query for new messages with read-only connection
+            with sqlite3.connect(f"file:{copy_path}?mode=ro", uri=True) as conn:
                 cursor = conn.cursor()
 
                 # Get messages with ROWID > last_processed_rowid
