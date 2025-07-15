@@ -106,7 +106,7 @@ class TestMessagesDatabaseChats(unittest.TestCase):
 
     def test_insert_chat_basic(self):
         """Test basic chat insertion"""
-        chat_id = "test_chat_1"
+        chat_id = 12345
         display_name = "Test Chat"
         user_ids = ["user1", "user2"]
 

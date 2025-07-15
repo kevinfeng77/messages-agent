@@ -179,6 +179,7 @@ class TestUser(unittest.TestCase):
             "last_name": "Doe",
             "phone_number": "(555) 123-4567",
             "email": "john@example.com",
+            "handle_id": None,
         }
 
         self.assertEqual(user.to_dict(), expected_dict)
