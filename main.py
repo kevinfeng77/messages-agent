@@ -42,29 +42,7 @@ from messaging.service import MessageService  # noqa: E402
 from messaging.config import MessageConfig  # noqa: E402
 
 
-def load_environment_variables():
-    """Load and validate required environment variables."""
-    missing_vars = []
-
-    for var in REQUIRED_ENV_VARS:
-        if not os.getenv(var):
-            missing_vars.append(var)
-
-    if missing_vars:
-        print("❌ Error: Missing required environment variables:")
-        for var in missing_vars:
-            print(f"  - {var}")
-        print("\nPlease set your environment variables in one of these ways:")
-        print("  1. Create a .env file with: ANTHROPIC_API_KEY=your_api_key_here")
-        print(
-            "  2. Export as environment variable: "
-            'export ANTHROPIC_API_KEY="your_api_key_here"'
-        )
-        return False
-
-    return True
-
-
+# Find chat by display name
 def find_chat_by_display_name(display_name: str) -> tuple[int, str]:
     """
     Find chat_id and first user_id by display name.
@@ -271,64 +249,59 @@ async def send_message_response(phone_number: str, message: str) -> bool:
 
 
 async def main():
-    """Main integration workflow."""
-    # Check environment and database
-    if not load_environment_variables():
-        return 1
 
+    # Get environment variables
+    for var in REQUIRED_ENV_VARS:
+        if not os.getenv(var):
+            print(f"Error: Missing required environment variable: {var}")
+            return 1
+
+    # Check database
     db_path = Path(DATABASE_PATH)
     if not db_path.exists():
-        print(f"❌ Error: Database file not found at {DATABASE_PATH}")
-        print("Please run the database migration scripts first.")
+        print(f"Database file not found at {DATABASE_PATH}")
         return 1
 
-    try:
-        display_name = input("Enter display name of the chat: ").strip()
-        if not display_name:
-            print("❌ No display name provided. Exiting.")
-            return 1
-
-        message_content = input("Enter the message to respond to: ").strip()
-        if not message_content:
-            print("❌ No message content provided. Exiting.")
-            return 1
-
-        # Generate responses
-        responses = generate_message_responses_with_context(
-            display_name, message_content
-        )
-
-        if not responses:
-            print("❌ No responses generated. Exiting.")
-            return 1
-        selected_index = display_response_options(responses)
-        selected_response = responses[selected_index]
-        print(f"\n✅ Selected: {selected_response}")
-        try:
-            chat_id, user_id = find_chat_by_display_name(display_name)
-            phone_number = get_user_phone_number(user_id)
-        except Exception as e:
-            print(f"❌ Error getting recipient details: {e}")
-            return 1
-        success = await send_message_response(phone_number, selected_response)
-
-        if success:
-            return 0
-        else:
-            print("❌ Workflow failed during message sending.")
-            return 1
-
-    except KeyboardInterrupt:
-        print("\n\n👋 Cancelled by user.")
+    # Get display name
+    display_name = input("Enter display name of the chat: ").strip()
+    if not display_name:
+        print("No display name provided. Exiting.")
         return 1
-    except Exception as e:
-        print(f"\n❌ Unexpected error: {e}")
-        import traceback
 
-        traceback.print_exc()
+    # Get message content
+    message_content = input("Enter the message to respond to: ").strip()
+    if not message_content:
+        print("No message content provided. Exiting.")
         return 1
+
+    # Generate responses
+    responses = generate_message_responses_with_context(
+        display_name, message_content
+    )
+
+    if not responses:
+        print("No responses generated. Exiting.")
+        return 1
+
+    # Display response options
+    selected_index = display_response_options(responses)
+    selected_response = responses[selected_index]
+    print(f"\nSelected: {selected_response}")
+
+    # Get recipient details
+    _, user_id = find_chat_by_display_name(display_name)
+    phone_number = get_user_phone_number(user_id)
+
+    # Send message
+    success = await send_message_response(phone_number, selected_response)
+
+    if not success:
+        print("Workflow failed during message sending.")
+        return 1
+
+    print("Workflow completed successfully!")
+    return 0
 
 
 if __name__ == "__main__":
-    exit_code = asyncio.run(main())
-    sys.exit(exit_code)
+    sys.exit(asyncio.run(main()))
