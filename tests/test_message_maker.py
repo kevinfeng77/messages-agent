@@ -14,6 +14,14 @@ import sys
 import os
 from pathlib import Path
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # If python-dotenv is not installed, continue without .env loading
+    pass
+
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
@@ -129,8 +137,9 @@ def main():
     # Check for required environment variables
     if not os.getenv("ANTHROPIC_API_KEY"):
         print("❌ Error: ANTHROPIC_API_KEY environment variable is required")
-        print("Please set your Anthropic API key:")
-        print("  export ANTHROPIC_API_KEY=\"your_api_key_here\"")
+        print("Please set your Anthropic API key in one of these ways:")
+        print("  1. Create a .env file with: ANTHROPIC_API_KEY=your_api_key_here")
+        print("  2. Export as environment variable: export ANTHROPIC_API_KEY=\"your_api_key_here\"")
         sys.exit(1)
     
     # Check if database exists
