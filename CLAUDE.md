@@ -19,7 +19,7 @@ Before implementing ANY Linear ticket, you MUST create a new worktree:
    # IMPORTANT: Create worktrees as subdirectories, not sibling directories
    # This avoids Claude Code security restrictions on directory access
    mkdir -p worktrees
-   git worktree add worktrees/{ticket-description} -b kevin/{description-of-changes}
+   git worktree add worktrees/{ticket-description} -b ${USER}/{description-of-changes}
    cd worktrees/{ticket-description}
    ```
 
