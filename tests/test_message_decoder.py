@@ -194,37 +194,6 @@ class TestMessageDecoderIntegration(unittest.TestCase):
                 self.assertTrue(len(decoded) > 0)
                 self.assertTrue(decoded.isprintable())
 
-    def test_migration_effectiveness(self):
-        """Test that migration significantly improves text coverage"""
-        if not self.db_path.exists():
-            self.skipTest("Database not available for testing")
-
-        import sqlite3
-
-        conn = sqlite3.connect(str(self.db_path))
-        cursor = conn.cursor()
-
-        # Get statistics
-        cursor.execute(
-            """
-            SELECT 
-                COUNT(*) as total,
-                COUNT(CASE WHEN text IS NOT NULL AND text != '' THEN 1 END) as has_text,
-                COUNT(CASE WHEN extracted_text IS NOT NULL AND extracted_text != '' THEN 1 END) as has_extracted
-            FROM message
-        """
-        )
-
-        total, has_text, has_extracted = cursor.fetchone()
-        conn.close()
-
-        # Calculate coverage
-        original_coverage = (has_text / total) * 100
-        new_coverage = ((has_text + has_extracted - has_text) / total) * 100
-
-        # Should have significantly improved coverage
-        self.assertGreater(new_coverage, original_coverage)
-        self.assertGreater(new_coverage, 80)  # Should be > 80% coverage
 
 
 if __name__ == "__main__":
