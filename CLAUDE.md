@@ -62,13 +62,6 @@ If git worktrees are not available, fall back to standard branching:
 
 **NEVER work directly on main or existing branches for new tickets - this step is NON-NEGOTIABLE.**
 
-## Project Overview
-This is the Message Agent system - an AI-powered communication assistant that analyzes message patterns, builds user profiles, and provides intelligent response suggestions. The system uses Graphiti for knowledge graph management and spans 4 main phases:
-
-1. **Phase 1**: Data Preparation & Graphiti Integration
-2. **Phase 2**: Data Ingestion Pipeline  
-3. **Phase 3**: Intelligence Layer
-4. **Phase 4**: Live Response System
 
 ## Linear Integration Workflow
 
@@ -166,64 +159,127 @@ When you receive a Linear ticket link or ID:
 
 ## Project Context & Architecture
 
+**Current System Status:**
+This is a **functional AI messaging assistant** with complete message processing, AI response generation, and live polling capabilities. The system is operational and actively used for intelligent message responses.
+
 ### Technology Stack
-- **Backend**: Python/TypeScript (TBD based on task)
-- **Database**: Neo4j (graph), Redis (queuing), SQLite (current messages)
-- **AI/ML**: Graphiti for knowledge graphs, OpenAI/Claude for response generation
-- **Infrastructure**: Docker, monitoring with Prometheus/Grafana
+- **Backend**: Python 3.11+ with asyncio for concurrent operations
+- **Database**: SQLite with normalized schema (users, chats, messages, relationships)
+- **AI/ML**: Anthropic Claude API for response generation, Graphiti framework for knowledge graphs
+- **Message Processing**: AppleScript integration with Messages.app, binary text decoding
+- **Infrastructure**: Local processing with comprehensive logging and validation
 
 ### Current Codebase Structure
 ```
-ai_text_agent/
+messages-agent/
+├── main.py                      # 🚀 Interactive AI response generation workflow
+├── polling_main.py              # 📱 Real-time message polling with notifications
 ├── src/
 │   ├── database/
-│   │   ├── manager.py           # SQLite message database management
+│   │   ├── manager.py           # Original Messages.app database copying
+│   │   ├── messages_db.py       # ✅ Normalized database with users/chats/messages
 │   │   ├── migrator.py          # Database migration utilities
-│   │   ├── message_migration.py # Message text decoding migration
-│   │   └── tests/               # Database-related tests
+│   │   ├── message_migration.py # Message text decoding from binary
+│   │   ├── polling_service.py   # ✅ Live message polling service
+│   │   ├── smart_manager.py     # Smart database copy management
+│   │   └── tests/               # Database tests
+│   ├── message_maker/
+│   │   ├── api.py               # ✅ AI response generation API
+│   │   ├── chat_history.py      # Chat context retrieval
+│   │   ├── llm_client.py        # Claude API integration
+│   │   └── types.py             # Message request/response types
 │   ├── messaging/
-│   │   ├── decoder.py           # Message text decoding from binary
-│   │   └── tests/               # Messaging-related tests
-│   ├── graphiti/
-│   │   ├── episode_manager.py   # Graphiti knowledge graph management
-│   │   ├── example_script.py    # Graphiti usage examples
+│   │   ├── decoder.py           # ✅ Binary message text decoding
+│   │   ├── service.py           # ✅ Message sending via AppleScript
+│   │   ├── config.py            # Messaging configuration
+│   │   ├── applescript_service.py # AppleScript integration
+│   │   └── exceptions.py        # Messaging exceptions
+│   ├── user/
+│   │   ├── user.py              # User data model
+│   │   ├── service.py           # User lookup and phone number formatting
+│   │   ├── handle_matcher.py    # Handle ID to user mapping
+│   │   └── tests/               # User service tests
+│   ├── extractors/
+│   │   ├── addressbook_extractor.py # Contact data extraction
+│   │   └── tests/
+│   ├── graphiti/                # 🔄 Knowledge graph framework (ready for integration)
+│   │   ├── episode_manager.py   # Graphiti episode management
 │   │   ├── query_manager.py     # Graph query utilities
-│   │   └── tests/               # Graphiti-related tests
+│   │   └── example_script.py    # Usage examples
 │   └── utils/
-│       ├── logger_config.py     # Logging configuration
-│       └── tests/               # Utility tests
-├── scripts/                     # Standalone utility scripts
-│   ├── migrate_database.py      # Database migration runner
-│   ├── validate_implementation.py # Implementation validation
-│   └── run_full_migration.py    # Full migration automation
-├── data/                        # Message databases and exports
-├── logs/                        # Application logs
-├── tests/                       # Integration tests
+│       ├── logger_config.py     # Centralized logging
+│       └── load_env.py          # Environment variable loading
+├── scripts/                     # 🛠️ Organized utility scripts
+│   ├── copy_messages_database.py    # Copy Messages.app database
+│   ├── setup_messages_database.py  # Setup normalized database
+│   ├── migration/               # Database schema migrations
+│   ├── validation/              # ✅ Comprehensive validation scripts
+│   │   ├── validate_live_polling.py     # Live polling validation
+│   │   ├── validate_message_maker.py    # AI response validation
+│   │   ├── validate_message_sending.py  # Message sending validation
+│   │   └── [12+ other validation scripts]
+│   └── debug/                   # Debugging utilities
+├── tests/                       # 🧪 Comprehensive test suite (321+ tests)
+│   ├── integration/             # Integration tests
+│   ├── unit/                    # Unit tests by module
+│   │   ├── database/           # Database layer tests
+│   │   ├── user/               # User service tests
+│   │   └── extractors/         # Extractor tests
+│   └── [25+ test files]        # Core functionality tests
+├── data/                        # Generated databases and logs
+│   ├── copy/                   # Messages.app database copy
+│   ├── messages.db             # ✅ Normalized database
+│   └── [log files]
+├── justfile                     # ⚡ Task runner with 10+ commands
+├── CLAUDE.md                    # 📋 AI assistant instructions
 └── requirements.txt             # Python dependencies
 ```
 
+**Key Operational Files:**
+- **`main.py`**: Complete AI response workflow (input → AI suggestions → send)
+- **`polling_main.py`**: Real-time message monitoring with notifications
+- **`src/message_maker/api.py`**: Core AI response generation
+- **`src/database/polling_service.py`**: Live message detection
+- **`src/messaging/service.py`**: Automated message sending
+
 ### Key Design Principles
-- **Privacy First**: Encryption, PII protection, user consent
-- **Minimal Viable Entities**: Start simple, let Graphiti build complexity
-- **Real-time Processing**: Streaming ingestion with queue management
-- **Extensible Architecture**: Support multiple messaging platforms
-- **Observable Systems**: Comprehensive logging, metrics, and monitoring
+- **Privacy First**: All processing local, no external data sharing, Messages.app database copied safely
+- **Operational Excellence**: Working AI response system with 321+ tests, comprehensive validation
+- **Real-time Capabilities**: Live message polling, instant notifications, sub-second response times
+- **Modular Architecture**: Clean separation between database, AI, messaging, and user layers
+- **Developer Experience**: Simple setup (`just setup`), extensive testing, organized scripts
 
 ## Common Patterns & Guidelines
 
 ### For Database Tasks
-- Use existing `database_manager.py` patterns
-- Implement proper error handling and logging
-- Include migration scripts for schema changes
-- Write comprehensive tests for data operations
+- Use `MessagesDatabase` class from `src/database/messages_db.py` for normalized operations
+- Use `MessagePollingService` for live message detection and processing
+- Follow existing patterns in `src/database/manager.py` for Messages.app database copying
+- Implement proper error handling and logging using `src/utils/logger_config.py`
+- Write comprehensive tests for data operations (see `tests/unit/database/`)
 
-### For API Development
-- Follow RESTful conventions
-- Implement proper authentication and rate limiting
-- Include OpenAPI/Swagger documentation
-- Use structured logging with correlation IDs
+### For AI Response Generation
+- Use `generate_message_responses()` from `src/message_maker/api.py`
+- Build `MessageRequest` objects with chat_id, user_id, and contents
+- Configure context limits appropriately (default: 200 messages)
+- Handle AI API errors gracefully with fallback responses
+- Test with various message types and edge cases
 
-### For Graphiti Integration
+### For Message Processing
+- Use `MessageService` from `src/messaging/service.py` for sending messages
+- Apply text decoding with `src/messaging/decoder.py` for binary message content
+- Configure AppleScript permissions properly for Messages.app integration
+- Format phone numbers using `UserService.format_phone_number()`
+- Test message sending with various recipient formats
+
+### For Live Polling
+- Use `MessagePollingService` with appropriate poll intervals (1-5 seconds)
+- Implement proper callback functions for new message notifications
+- Handle database copy freshness and automatic refreshing
+- Monitor performance metrics and optimize batch sizes
+- Test with high-frequency message scenarios
+
+### For Graphiti Integration (Future)
 - Design minimal episodes with clear temporal boundaries
 - Let Graphiti extract relationships and facts
 - Implement proper error handling for graph operations
@@ -239,22 +295,40 @@ ai_text_agent/
 - **Regression Tests**: Ensure existing functionality still works
 
 **Testing Requirements:**
-- Minimum 80% code coverage for new code
-- All tests must pass before PR creation
+- Minimum 100% code coverage for new code
+- All tests must pass before PR creation (`just test` should show 321+ passing tests)
 - Include both positive and negative test cases
 - Test with real data samples when available
+- Use existing test patterns from current 25+ test files
 - Document test approach in implementation plan
 
-**Test File Structure:**
+**Current Test Organization:**
 ```
 tests/
-├── unit/
-│   └── test_[module_name].py
-├── integration/
-│   └── test_[feature_name]_integration.py
-└── validation/
-    └── validate_[feature_name].py
+├── unit/                        # 🧪 Unit tests (isolated components)
+│   ├── database/               # Database layer tests
+│   ├── user/                   # User service tests  
+│   ├── extractors/             # Data extraction tests
+│   └── test_[module].py        # Individual module tests
+├── integration/                 # 🔄 Integration tests (cross-component)
+│   └── test_[feature]_integration.py
+├── test_[feature].py           # 📋 Feature-level tests (25+ files)
+│   ├── test_api.py             # AI response generation
+│   ├── test_live_polling_integration.py  # Live polling
+│   ├── test_message_decoder.py # Text decoding
+│   ├── test_messaging_service.py # Message sending
+│   └── [21+ other test files]
+└── scripts/validation/         # ✅ End-to-end validation
+    ├── validate_live_polling.py
+    ├── validate_message_maker.py
+    └── [12+ validation scripts]
 ```
+
+**Test Running:**
+- `just test` - Run all tests (currently 321+ passing)
+- Individual test files can be run with pytest
+- Tests use realistic data patterns and comprehensive mocking
+- Both unit and integration tests validate core functionality
 
 ### For Script Organization (MANDATORY)
 **All scripts must be organized into proper subdirectories:**
@@ -364,17 +438,31 @@ All branches should follow the pattern: `${USER}/{description-of-changes-in-few-
 
 ### Development Commands
 ```bash
-# Install dependencies
+# Complete setup from clean state
+just setup
+
+# Install dependencies  
 pip install -r requirements.txt
 
-# Run database migrations
-python src/database_migrator.py
+# Run tests (321+ tests)
+just test
 
-# Run tests (when test suite is implemented)
-pytest tests/
+# Run validation scripts
+just validate
 
-# Start development server (when API is implemented)
-python -m uvicorn main:app --reload
+# Code quality
+just lint       # Run linting checks
+just format     # Format code with black/isort
+
+# Database operations
+just copy       # Copy Messages.app database
+just create     # Create normalized database
+just clean      # Clean data directory
+just stats      # Show database statistics
+
+# Main workflows
+python main.py          # Interactive AI response generation
+python polling_main.py  # Real-time message polling with notifications
 ```
 
 ### Git Commands
@@ -517,10 +605,10 @@ mcp__github__create_pull_request(
 #### Required Status Checks
 The repository uses a GitHub Actions workflow (`.github/workflows/test.yml`) that runs:
 
-1. **Test Suite**: `just test` - Runs all unit and integration tests
+1. **Test Suite**: `just test` - Runs all unit and integration tests (321+ tests)
 2. **Dependencies**: Automatic installation of testing dependencies
 
-**Note**: Code formatting, linting, and validation scripts are currently disabled pending setup fixes.
+**Current Status**: Test suite is fully operational with 321+ passing tests. Code formatting and linting checks are available via `just lint` and `just format`.
 
 #### Workflow Triggers
 - **Pull Requests**: All PRs to `main` or `master` branches
@@ -545,37 +633,39 @@ on:
 ```
 
 **This ensures no code reaches main without:**
-- ✅ All tests passing (`just test`)
-
-**Note**: Code formatting, linting, and validation checks will be added to CI once properly configured.
+- ✅ All tests passing (`just test` - 321+ tests)
 
 ### Linting & Quality (MANDATORY BEFORE PR)
 ```bash
-# Format code (REQUIRED)
-black src/
-isort src/
+# Use Just commands for standardized quality checks
+just lint       # Run flake8, mypy, and other linting tools
+just format     # Format code with black and isort
 
-# Type checking (REQUIRED)
+# Manual commands (if needed)
+black src/ tests/
+isort src/ tests/
+flake8 src/
 mypy src/
 
-# Linting (REQUIRED)
-flake8 src/
-
 # Verify all checks pass locally before pushing
-black --check src/ && isort --check-only src/ && flake8 src/ && mypy src/
+just lint && just test
 ```
 
 **MANDATORY Pre-Push Checks:**
-- All linting tools must pass before pushing changes
-- Use the verification command above to ensure GitHub Actions will pass
-- Never push code that fails local linting checks
+- All tests must pass: `just test` (321+ tests)
+- Code must be properly formatted: `just format`
+- Linting checks must pass: `just lint`
+- Never push code that fails local quality checks
 
-## Linear Project Mapping
+## Current Implementation Status
 
-- **Phase 1 Tasks**: Data schema design, conversation detection, Graphiti setup
-- **Phase 2 Tasks**: Message transformation, real-time ingestion, data quality
-- **Phase 3 Tasks**: User profiling, contextual search, response generation
-- **Phase 4 Tasks**: Message interception, live responses, monitoring
+**✅ Completed Core Features:**
+- **Message Database Processing**: Complete extraction and normalization from Messages.app
+- **AI Response Generation**: Interactive workflow with Claude API integration
+- **Live Message Polling**: Real-time message detection with notifications
+- **Message Sending**: AppleScript-based automated message sending
+- **Comprehensive Testing**: 321+ tests with validation scripts
+
 
 ## Complete Implementation Workflow
 
@@ -666,6 +756,6 @@ black --check src/ && isort --check-only src/ && flake8 src/ && mypy src/
 - ✅ Validation script created and executed successfully
 - ✅ PR created using GitHub MCP with comprehensive documentation
 - ✅ Performance metrics documented and success criteria met
-- ✅ Code coverage ≥80% for new functionality
+- ✅ No failed tests
 
 When in doubt, ask clarifying questions about requirements, architecture decisions, or integration approaches. The goal is to build a robust, scalable, and maintainable system that respects user privacy while providing intelligent communication assistance.
