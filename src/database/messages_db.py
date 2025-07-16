@@ -193,8 +193,7 @@ class MessagesDatabase:
                         count INTEGER NOT NULL,
                         summary TEXT,  -- AI generated summary
                         status TEXT DEFAULT 'active',  -- active, completed
-                        initiated_by TEXT NOT NULL,  -- user_id that initiated this chat
-                        FOREIGN KEY (chat_id) REFERENCES chats (chat_id) ON DELETE CASCADE
+                        initiated_by TEXT NOT NULL  -- user_id that initiated this chat
                     )
                 """
                 )
@@ -206,9 +205,7 @@ class MessagesDatabase:
                         conversation_id TEXT NOT NULL,
                         message_id INTEGER NOT NULL,
                         sequence_number INTEGER NOT NULL,  -- order within conversation
-                        PRIMARY KEY (conversation_id, message_id),
-                        FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id) ON DELETE CASCADE,
-                        FOREIGN KEY (message_id) REFERENCES messages(message_id) ON DELETE CASCADE
+                        PRIMARY KEY (conversation_id, message_id)
                     )
                 """
                 )
@@ -223,8 +220,7 @@ class MessagesDatabase:
                         embedding_model TEXT NOT NULL,  -- e.g., 'text-embedding-3-small'
                         embedding_dimension INTEGER NOT NULL,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        metadata TEXT,  -- JSON: Store participant names, dates, etc.
-                        FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id) ON DELETE CASCADE
+                        metadata TEXT  -- JSON: Store participant names, dates, etc.
                     )
                 """
                 )
