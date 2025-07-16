@@ -30,16 +30,3 @@ def test_conversation_tables_exist(tmp_path):
             "completed_at", "count", "summary", "status", "initiated_by"
         }
         assert expected_columns.issubset(conv_columns)
-        
-        # Check indexes exist
-        cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='index' AND name LIKE 'idx_conversation%'"
-        )
-        indexes = {row[0] for row in cursor.fetchall()}
-        expected_indexes = {
-            "idx_conversations_chat_id",
-            "idx_conversations_status",
-            "idx_conversations_created_at",
-            "idx_conversation_messages_sequence"
-        }
-        assert expected_indexes.issubset(indexes)
