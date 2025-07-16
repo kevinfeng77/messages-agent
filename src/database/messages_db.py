@@ -27,6 +27,9 @@ class MessagesDatabase:
         try:
             with sqlite3.connect(str(self.db_path)) as conn:
                 cursor = conn.cursor()
+                
+                # Enable foreign key constraints
+                cursor.execute("PRAGMA foreign_keys = ON")
 
                 # Create users table with handle_id column
                 cursor.execute(
@@ -178,9 +181,54 @@ class MessagesDatabase:
                     "CREATE INDEX IF NOT EXISTS idx_polling_state_last_sync ON polling_state(last_sync_timestamp)"
                 )
 
+                # Create conversations table
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS conversations (
+                        conversation_id TEXT PRIMARY KEY,
+                        chat_id INTEGER NOT NULL,
+                        users TEXT NOT NULL,  -- JSON array of participant user_ids
+                        created_at TIMESTAMP NOT NULL,
+                        completed_at TIMESTAMP,  -- can be null for in progress chats
+                        count INTEGER NOT NULL,
+                        summary TEXT,  -- AI generated summary
+                        status TEXT DEFAULT 'active',  -- active, completed
+                        initiated_by TEXT NOT NULL  -- user_id that initiated this chat
+                    )
+                """
+                )
+
+                # Create conversation_messages table
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS conversation_messages (
+                        conversation_id TEXT NOT NULL,
+                        message_id INTEGER NOT NULL,
+                        sequence_number INTEGER NOT NULL,  -- order within conversation
+                        PRIMARY KEY (conversation_id, message_id)
+                    )
+                """
+                )
+
+                # Create conversation_embeddings table
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS conversation_embeddings (
+                        embedding_id TEXT PRIMARY KEY,
+                        conversation_id TEXT NOT NULL,
+                        embedding_vector BLOB NOT NULL,  -- numpy array as bytes
+                        embedding_model TEXT NOT NULL,  -- e.g., 'text-embedding-3-small'
+                        embedding_dimension INTEGER NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        metadata TEXT  -- JSON: Store participant names, dates, etc.
+                    )
+                """
+                )
+
+
                 conn.commit()
                 logger.info(
-                    f"Created messages database with users, chats, messages, and chat_messages tables at {self.db_path}"
+                    f"Created messages database with users, chats, messages, chat_messages, conversations, and embeddings tables at {self.db_path}"
                 )
                 return True
 
@@ -1668,3 +1716,4 @@ class MessagesDatabase:
         except sqlite3.Error as e:
             logger.error(f"Error setting sync status: {e}")
             return False
+        
