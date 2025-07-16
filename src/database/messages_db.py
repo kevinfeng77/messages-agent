@@ -27,6 +27,9 @@ class MessagesDatabase:
         try:
             with sqlite3.connect(str(self.db_path)) as conn:
                 cursor = conn.cursor()
+                
+                # Enable foreign key constraints
+                cursor.execute("PRAGMA foreign_keys = ON")
 
                 # Create users table with handle_id column
                 cursor.execute(
@@ -178,9 +181,74 @@ class MessagesDatabase:
                     "CREATE INDEX IF NOT EXISTS idx_polling_state_last_sync ON polling_state(last_sync_timestamp)"
                 )
 
+                # Create conversations table
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS conversations (
+                        conversation_id TEXT PRIMARY KEY,
+                        chat_id INTEGER NOT NULL,
+                        users TEXT NOT NULL,  -- JSON array of participant user_ids
+                        created_at TIMESTAMP NOT NULL,
+                        completed_at TIMESTAMP,  -- can be null for in progress chats
+                        count INTEGER NOT NULL,
+                        summary TEXT,  -- AI generated summary
+                        status TEXT DEFAULT 'active',  -- active, completed
+                        initiated_by TEXT NOT NULL,  -- user_id that initiated this chat
+                        FOREIGN KEY (chat_id) REFERENCES chats (chat_id) ON DELETE CASCADE
+                    )
+                """
+                )
+
+                # Create conversation_messages table
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS conversation_messages (
+                        conversation_id TEXT NOT NULL,
+                        message_id INTEGER NOT NULL,
+                        sequence_number INTEGER NOT NULL,  -- order within conversation
+                        PRIMARY KEY (conversation_id, message_id),
+                        FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id) ON DELETE CASCADE,
+                        FOREIGN KEY (message_id) REFERENCES messages(message_id) ON DELETE CASCADE
+                    )
+                """
+                )
+
+                # Create conversation_embeddings table
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS conversation_embeddings (
+                        embedding_id TEXT PRIMARY KEY,
+                        conversation_id TEXT NOT NULL,
+                        embedding_vector BLOB NOT NULL,  -- numpy array as bytes
+                        embedding_model TEXT NOT NULL,  -- e.g., 'text-embedding-3-small'
+                        embedding_dimension INTEGER NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        metadata TEXT,  -- JSON: Store participant names, dates, etc.
+                        FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id) ON DELETE CASCADE
+                    )
+                """
+                )
+
+                # Create indexes for conversations tables
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_conversations_chat_id ON conversations(chat_id)"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_conversations_status ON conversations(status)"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_conversations_created_at ON conversations(created_at)"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_conversation_messages_sequence ON conversation_messages(conversation_id, sequence_number)"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_embeddings_conversation ON conversation_embeddings(conversation_id)"
+                )
+
                 conn.commit()
                 logger.info(
-                    f"Created messages database with users, chats, messages, and chat_messages tables at {self.db_path}"
+                    f"Created messages database with users, chats, messages, chat_messages, conversations, and embeddings tables at {self.db_path}"
                 )
                 return True
 
@@ -1668,3 +1736,460 @@ class MessagesDatabase:
         except sqlite3.Error as e:
             logger.error(f"Error setting sync status: {e}")
             return False
+
+    # Conversation-related methods
+
+    def insert_conversation(
+        self,
+        conversation_id: str,
+        chat_id: int,
+        users: List[str],
+        created_at: str,
+        initiated_by: str,
+        count: int = 0,
+        completed_at: Optional[str] = None,
+        summary: Optional[str] = None,
+        status: str = "active",
+    ) -> bool:
+        """
+        Insert a conversation into the conversations table
+        
+        Args:
+            conversation_id: Unique identifier for the conversation
+            chat_id: Associated chat ID
+            users: List of user_ids participating in the conversation
+            created_at: Timestamp when conversation started (ISO format)
+            initiated_by: User ID who initiated the conversation
+            count: Number of messages in the conversation
+            completed_at: Timestamp when conversation ended (ISO format)
+            summary: AI-generated summary of the conversation
+            status: Status of conversation ('active' or 'completed')
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            import json
+            
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+                
+                # Convert users list to JSON string
+                users_json = json.dumps(users)
+                
+                cursor.execute(
+                    """
+                    INSERT INTO conversations 
+                    (conversation_id, chat_id, users, created_at, completed_at, 
+                     count, summary, status, initiated_by)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                    (
+                        conversation_id,
+                        chat_id,
+                        users_json,
+                        created_at,
+                        completed_at,
+                        count,
+                        summary,
+                        status,
+                        initiated_by,
+                    ),
+                )
+                
+                conn.commit()
+                return True
+                
+        except sqlite3.Error as e:
+            logger.error(f"Error inserting conversation {conversation_id}: {e}")
+            return False
+
+    def get_conversation_by_id(self, conversation_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get a conversation by its ID
+        
+        Args:
+            conversation_id: Conversation ID to search for
+            
+        Returns:
+            Conversation dictionary if found, None otherwise
+        """
+        try:
+            import json
+            
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute(
+                    """
+                    SELECT conversation_id, chat_id, users, created_at, completed_at,
+                           count, summary, status, initiated_by
+                    FROM conversations WHERE conversation_id = ?
+                """,
+                    (conversation_id,),
+                )
+                
+                row = cursor.fetchone()
+                if row:
+                    (
+                        conversation_id,
+                        chat_id,
+                        users_json,
+                        created_at,
+                        completed_at,
+                        count,
+                        summary,
+                        status,
+                        initiated_by,
+                    ) = row
+                    
+                    return {
+                        "conversation_id": conversation_id,
+                        "chat_id": chat_id,
+                        "users": json.loads(users_json),
+                        "created_at": created_at,
+                        "completed_at": completed_at,
+                        "count": count,
+                        "summary": summary,
+                        "status": status,
+                        "initiated_by": initiated_by,
+                    }
+                    
+                return None
+                
+        except sqlite3.Error as e:
+            logger.error(f"Error getting conversation {conversation_id}: {e}")
+            return None
+
+    def get_conversations_by_chat_id(
+        self, chat_id: int, status: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Get all conversations for a specific chat
+        
+        Args:
+            chat_id: Chat ID to get conversations for
+            status: Optional status filter ('active' or 'completed')
+            
+        Returns:
+            List of conversation dictionaries
+        """
+        try:
+            import json
+            
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+                
+                query = """
+                    SELECT conversation_id, chat_id, users, created_at, completed_at,
+                           count, summary, status, initiated_by
+                    FROM conversations WHERE chat_id = ?
+                """
+                params = [chat_id]
+                
+                if status:
+                    query += " AND status = ?"
+                    params.append(status)
+                    
+                query += " ORDER BY created_at DESC"
+                
+                cursor.execute(query, params)
+                
+                conversations = []
+                for row in cursor.fetchall():
+                    (
+                        conversation_id,
+                        chat_id,
+                        users_json,
+                        created_at,
+                        completed_at,
+                        count,
+                        summary,
+                        status,
+                        initiated_by,
+                    ) = row
+                    
+                    conversations.append(
+                        {
+                            "conversation_id": conversation_id,
+                            "chat_id": chat_id,
+                            "users": json.loads(users_json),
+                            "created_at": created_at,
+                            "completed_at": completed_at,
+                            "count": count,
+                            "summary": summary,
+                            "status": status,
+                            "initiated_by": initiated_by,
+                        }
+                    )
+                    
+                return conversations
+                
+        except sqlite3.Error as e:
+            logger.error(f"Error getting conversations for chat {chat_id}: {e}")
+            return []
+
+    def update_conversation_status(
+        self,
+        conversation_id: str,
+        status: str,
+        completed_at: Optional[str] = None,
+        summary: Optional[str] = None,
+    ) -> bool:
+        """
+        Update conversation status and optionally set completion time and summary
+        
+        Args:
+            conversation_id: Conversation ID to update
+            status: New status ('active' or 'completed')
+            completed_at: Optional completion timestamp (ISO format)
+            summary: Optional AI-generated summary
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+                
+                update_fields = ["status = ?"]
+                params = [status]
+                
+                if completed_at:
+                    update_fields.append("completed_at = ?")
+                    params.append(completed_at)
+                    
+                if summary:
+                    update_fields.append("summary = ?")
+                    params.append(summary)
+                    
+                params.append(conversation_id)
+                
+                query = f"""
+                    UPDATE conversations 
+                    SET {", ".join(update_fields)}
+                    WHERE conversation_id = ?
+                """
+                
+                cursor.execute(query, params)
+                conn.commit()
+                
+                return cursor.rowcount > 0
+                
+        except sqlite3.Error as e:
+            logger.error(f"Error updating conversation {conversation_id}: {e}")
+            return False
+
+    def insert_conversation_message(
+        self, conversation_id: str, message_id: int, sequence_number: int
+    ) -> bool:
+        """
+        Add a message to a conversation
+        
+        Args:
+            conversation_id: Conversation ID
+            message_id: Message ID to add
+            sequence_number: Order of message within conversation
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute(
+                    """
+                    INSERT INTO conversation_messages 
+                    (conversation_id, message_id, sequence_number)
+                    VALUES (?, ?, ?)
+                """,
+                    (conversation_id, message_id, sequence_number),
+                )
+                
+                # Update message count in conversations table
+                cursor.execute(
+                    """
+                    UPDATE conversations 
+                    SET count = count + 1
+                    WHERE conversation_id = ?
+                """,
+                    (conversation_id,),
+                )
+                
+                conn.commit()
+                return True
+                
+        except sqlite3.Error as e:
+            logger.error(
+                f"Error inserting conversation message ({conversation_id}, {message_id}): {e}"
+            )
+            return False
+
+    def get_conversation_messages(
+        self, conversation_id: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Get all messages in a conversation, ordered by sequence
+        
+        Args:
+            conversation_id: Conversation ID to get messages for
+            
+        Returns:
+            List of message dictionaries with sequence numbers
+        """
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute(
+                    """
+                    SELECT m.message_id, m.user_id, m.contents, m.is_from_me, 
+                           m.created_at, cm.sequence_number
+                    FROM messages m
+                    JOIN conversation_messages cm ON m.message_id = cm.message_id
+                    WHERE cm.conversation_id = ?
+                    ORDER BY cm.sequence_number
+                """,
+                    (conversation_id,),
+                )
+                
+                messages = []
+                for row in cursor.fetchall():
+                    (
+                        message_id,
+                        user_id,
+                        contents,
+                        is_from_me,
+                        created_at,
+                        sequence_number,
+                    ) = row
+                    
+                    messages.append(
+                        {
+                            "message_id": message_id,
+                            "user_id": user_id,
+                            "contents": contents,
+                            "is_from_me": bool(is_from_me),
+                            "created_at": created_at,
+                            "sequence_number": sequence_number,
+                            "conversation_id": conversation_id,
+                        }
+                    )
+                    
+                return messages
+                
+        except sqlite3.Error as e:
+            logger.error(f"Error getting messages for conversation {conversation_id}: {e}")
+            return []
+
+    def insert_conversation_embedding(
+        self,
+        embedding_id: str,
+        conversation_id: str,
+        embedding_vector: bytes,
+        embedding_model: str,
+        embedding_dimension: int,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        """
+        Insert a conversation embedding
+        
+        Args:
+            embedding_id: Unique identifier for the embedding
+            conversation_id: Associated conversation ID
+            embedding_vector: Numpy array as bytes
+            embedding_model: Model used (e.g., 'text-embedding-3-small')
+            embedding_dimension: Dimension of the embedding vector
+            metadata: Optional metadata as dictionary
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            import json
+            
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+                
+                metadata_json = json.dumps(metadata) if metadata else None
+                
+                cursor.execute(
+                    """
+                    INSERT INTO conversation_embeddings 
+                    (embedding_id, conversation_id, embedding_vector, 
+                     embedding_model, embedding_dimension, metadata)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                    (
+                        embedding_id,
+                        conversation_id,
+                        embedding_vector,
+                        embedding_model,
+                        embedding_dimension,
+                        metadata_json,
+                    ),
+                )
+                
+                conn.commit()
+                return True
+                
+        except sqlite3.Error as e:
+            logger.error(f"Error inserting embedding {embedding_id}: {e}")
+            return False
+
+    def get_conversation_embedding(
+        self, conversation_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get embedding for a conversation
+        
+        Args:
+            conversation_id: Conversation ID to get embedding for
+            
+        Returns:
+            Embedding dictionary if found, None otherwise
+        """
+        try:
+            import json
+            
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.cursor()
+                
+                cursor.execute(
+                    """
+                    SELECT embedding_id, conversation_id, embedding_vector,
+                           embedding_model, embedding_dimension, created_at, metadata
+                    FROM conversation_embeddings 
+                    WHERE conversation_id = ?
+                """,
+                    (conversation_id,),
+                )
+                
+                row = cursor.fetchone()
+                if row:
+                    (
+                        embedding_id,
+                        conversation_id,
+                        embedding_vector,
+                        embedding_model,
+                        embedding_dimension,
+                        created_at,
+                        metadata_json,
+                    ) = row
+                    
+                    return {
+                        "embedding_id": embedding_id,
+                        "conversation_id": conversation_id,
+                        "embedding_vector": embedding_vector,
+                        "embedding_model": embedding_model,
+                        "embedding_dimension": embedding_dimension,
+                        "created_at": created_at,
+                        "metadata": json.loads(metadata_json) if metadata_json else None,
+                    }
+                    
+                return None
+                
+        except sqlite3.Error as e:
+            logger.error(f"Error getting embedding for conversation {conversation_id}: {e}")
+            return None
